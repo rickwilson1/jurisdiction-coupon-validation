@@ -55,6 +55,10 @@ def find_tax_district(lat: float, lon: float, gdf: gpd.GeoDataFrame):
 # STREAMLIT UI
 # ---------------------------------------------------
 st.set_page_config(page_title="Agromin Coupon Code Validation", layout="wide")
+
+# Logo at top left
+st.image("agromin_logo.png", width=300)
+
 st.title("🏙️ Coupon Code Qualification - Jurisdiction Identification")
 
 address = st.text_input("Enter a California address:")
