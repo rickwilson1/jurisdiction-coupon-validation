@@ -2,12 +2,14 @@ import requests
 import geopandas as gpd
 import streamlit as st
 from shapely.geometry import Point
+import os
 
 # ---------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------
 SHAPEFILE_PATH = "CDTFA_TaxDistricts.gpkg"  # Adjust if needed
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "agromin_logo.png")
 
 # ---------------------------------------------------
 # HELPERS
@@ -57,7 +59,10 @@ def find_tax_district(lat: float, lon: float, gdf: gpd.GeoDataFrame):
 st.set_page_config(page_title="Agromin Coupon Code Validation", layout="wide")
 
 # Logo at top left
-st.image("agromin_logo.png", width=300)
+if os.path.exists(LOGO_PATH):
+    st.image(LOGO_PATH, width=300)
+else:
+    st.warning(f"Logo not found at: {LOGO_PATH}")
 
 st.title("🏙️ Coupon Code Qualification - Jurisdiction Identification")
 
