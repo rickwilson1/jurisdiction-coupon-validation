@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     gdal-bin \
     libgeos-dev \
     libproj-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for layer caching
@@ -25,9 +26,7 @@ COPY . .
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK CMD curl --fail http://localhost:8080/_stcore/health || exit 1
+HEALTHCHECK CMD curl --fail http://localhost:8080/health || exit 1
 
-# Run Streamlit on port 8080 (Cloud Run default)
-ENTRYPOINT ["streamlit", "run", "jurisd_lookup.py", "--server.port=8080", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
-
-
+# Run FastAPI with uvicorn on port 8080
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
