@@ -121,4 +121,11 @@ A simple web form is also available at the root URL for manual lookups:
 https://tax-lookup-904065377096.us-west1.run.app/
 
 
+CONTACT
+-------
+Created by: Rick Wilson
+Email:      rickwilson@agromin.com
+Phone:      (650) 704-8466
+
+
 ================================================================================
