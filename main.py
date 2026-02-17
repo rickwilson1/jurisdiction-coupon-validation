@@ -1,5 +1,6 @@
 import requests
 import geopandas as gpd
+import pandas as pd
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from shapely.geometry import Point
@@ -8,17 +9,20 @@ import re
 import csv
 from functools import lru_cache
 from datetime import datetime, date
-from io import StringIO
+from io import StringIO, BytesIO
 
 # ---------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------
 SHAPEFILE_PATH = os.path.join(os.path.dirname(__file__), "CDTFA_TaxDistricts.gpkg")
-COUPONS_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
+COUPONS_CSV_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
+COUPONS_XLSX_PATH = os.path.join(os.path.dirname(__file__), "coupons.xlsx")
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
 
-# Cloud Storage URL (for production - allows updating coupons without redeploy)
-COUPONS_GCS_URL = os.environ.get("COUPONS_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.csv")
+# Cloud Storage URLs (for production - allows updating coupons without redeploy)
+# API checks xlsx first, then csv
+COUPONS_GCS_XLSX_URL = os.environ.get("COUPONS_XLSX_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.xlsx")
+COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.csv")
 
 app = FastAPI(title="Coupon Validation API", version="2.0.0")
 
@@ -42,9 +46,10 @@ _coupon_cache_time = None
 
 def load_coupons(force_refresh: bool = False) -> dict:
     """
-    Load coupon data from CSV (local or Cloud Storage).
+    Load coupon data from XLSX or CSV (Cloud Storage or local).
     Returns dict keyed by coupon code.
     Caches for 5 minutes to allow updates without redeploy.
+    Tries xlsx first, then falls back to csv.
     """
     global _coupon_cache, _coupon_cache_time
     
@@ -54,42 +59,54 @@ def load_coupons(force_refresh: bool = False) -> dict:
         if age < 300:  # 5 minutes
             return _coupon_cache
     
-    coupons = {}
-    csv_content = None
+    df = None
     
-    # Try Cloud Storage first
-    if COUPONS_GCS_URL:
+    # Try Cloud Storage XLSX first
+    if COUPONS_GCS_XLSX_URL:
         try:
-            r = requests.get(COUPONS_GCS_URL, timeout=10)
+            r = requests.get(COUPONS_GCS_XLSX_URL, timeout=10)
             r.raise_for_status()
-            csv_content = r.text
+            df = pd.read_excel(BytesIO(r.content), engine='openpyxl')
         except Exception:
-            pass  # Fall back to local file
+            pass  # Try CSV next
     
-    # Fall back to local file
-    if not csv_content and os.path.exists(COUPONS_PATH):
-        with open(COUPONS_PATH, 'r', encoding='utf-8') as f:
-            csv_content = f.read()
+    # Try Cloud Storage CSV
+    if df is None and COUPONS_GCS_CSV_URL:
+        try:
+            r = requests.get(COUPONS_GCS_CSV_URL, timeout=10)
+            r.raise_for_status()
+            df = pd.read_csv(StringIO(r.text))
+        except Exception:
+            pass  # Fall back to local files
     
-    if not csv_content:
+    # Fall back to local XLSX
+    if df is None and os.path.exists(COUPONS_XLSX_PATH):
+        try:
+            df = pd.read_excel(COUPONS_XLSX_PATH, engine='openpyxl')
+        except Exception:
+            pass
+    
+    # Fall back to local CSV
+    if df is None and os.path.exists(COUPONS_CSV_PATH):
+        try:
+            df = pd.read_csv(COUPONS_CSV_PATH)
+        except Exception:
+            pass
+    
+    if df is None:
         return {}
     
-    # Parse CSV
-    reader = csv.DictReader(StringIO(csv_content))
-    for row in reader:
-        code = row.get('Coupon', '').strip().upper()
-        if code:
+    # Parse DataFrame to coupons dict
+    coupons = {}
+    for _, row in df.iterrows():
+        code = str(row.get('Coupon', '')).strip().upper()
+        if code and code != 'NAN':
             coupons[code] = {
                 'code': code,
-                'status': row.get('Program Status', '').strip(),
-                'jurisdiction': row.get('Jurisdiction', '').strip(),
-                'product': row.get('Product', '').strip(),
-                'start_date': parse_date(row.get('Start Date', '')),
-                'end_date': parse_date(row.get('End Date', '')),
-                'max_uses': row.get('%23 of Uses', '').strip(),
-                'max_quantity': row.get('Max. Quantity per Coupon', '').strip(),
-                'delivery_cost': row.get('Delivery Cost', '').strip(),
-                'website': row.get('Website', '').strip(),
+                'status': str(row.get('Program Status', '')).strip(),
+                'jurisdiction': str(row.get('Jurisdiction', '')).strip(),
+                'start_date': parse_date(row.get('Start Date')),
+                'end_date': parse_date(row.get('End Date')),
             }
     
     _coupon_cache = coupons
@@ -97,12 +114,28 @@ def load_coupons(force_refresh: bool = False) -> dict:
     return coupons
 
 
-def parse_date(date_str: str) -> date | None:
-    """Parse date string in M/D/YY format."""
-    if not date_str:
+def parse_date(date_val) -> date | None:
+    """Parse date from string (M/D/YY) or pandas Timestamp."""
+    if date_val is None or (isinstance(date_val, float) and pd.isna(date_val)):
         return None
+    
+    # Handle pandas Timestamp
+    if isinstance(date_val, pd.Timestamp):
+        return date_val.date()
+    
+    # Handle datetime
+    if isinstance(date_val, datetime):
+        return date_val.date()
+    
+    # Handle date
+    if isinstance(date_val, date):
+        return date_val
+    
+    # Handle string
     try:
-        date_str = date_str.strip()
+        date_str = str(date_val).strip()
+        if not date_str or date_str.lower() == 'nan':
+            return None
         # Handle M/D/YY format
         return datetime.strptime(date_str, "%m/%d/%y").date()
     except ValueError:

@@ -139,26 +139,33 @@ UPDATING COUPONS (Admin Only)
 Coupon data is stored in Google Cloud Storage and can be updated without
 redeploying the API. Changes take effect within 5 minutes.
 
-CSV File Location:
-  gs://agromin-coupon-data/coupons.csv
+Supported Formats:
+  - Excel (.xlsx) - RECOMMENDED for ease of editing
+  - CSV (.csv) - Also supported
 
-CSV Format (5 columns required):
-  Coupon,Program Status,Jurisdiction,Start Date,End Date
-  CITYVCOM26,Active,City of Ventura,1/1/26,12/16/26
-  COUVCOM26,Active,County of Ventura,1/1/26,12/15/26
+Cloud Storage Location:
+  gs://agromin-coupon-data/coupons.xlsx  (checked first)
+  gs://agromin-coupon-data/coupons.csv   (fallback)
+
+Required Columns (5 columns):
+  Coupon | Program Status | Jurisdiction | Start Date | End Date
+
+Example Data:
+  CITYVCOM26  | Active   | City of Ventura   | 1/1/26  | 12/16/26
+  COUVCOM26   | Active   | County of Ventura | 1/1/26  | 12/15/26
 
 To update coupons:
-1. Edit the local coupons.csv file
-2. Run this command to upload:
-   gcloud storage cp coupons.csv gs://agromin-coupon-data/coupons.csv
+1. Edit your Excel file (coupons.xlsx)
+2. Upload to Cloud Storage:
+   gcloud storage cp coupons.xlsx gs://agromin-coupon-data/coupons.xlsx
 3. Wait up to 5 minutes for cache refresh
 
 Column Descriptions:
   - Coupon:         Unique coupon code (case-insensitive)
   - Program Status: "Active" or "Inactive"
   - Jurisdiction:   "City of X" or "County of X"
-  - Start Date:     Format M/D/YY (e.g., 1/1/26)
-  - End Date:       Format M/D/YY (e.g., 12/31/26)
+  - Start Date:     Date format (Excel dates or M/D/YY text)
+  - End Date:       Date format (Excel dates or M/D/YY text)
 
 
 CONTACT
