@@ -1,7 +1,7 @@
 import requests
 import geopandas as gpd
 import pandas as pd
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, UploadFile, File, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from shapely.geometry import Point
 import os
@@ -21,8 +21,12 @@ GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServ
 
 # Cloud Storage URLs (for production - allows updating coupons without redeploy)
 # API checks xlsx first, then csv
-COUPONS_GCS_XLSX_URL = os.environ.get("COUPONS_XLSX_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.xlsx")
-COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.csv")
+COUPONS_GCS_BUCKET = os.environ.get("COUPONS_BUCKET", "agromin-coupon-data")
+COUPONS_GCS_XLSX_URL = os.environ.get("COUPONS_XLSX_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.xlsx")
+COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.csv")
+
+# Simple API key for upload endpoint (set this in Cloud Run environment)
+UPLOAD_API_KEY = os.environ.get("UPLOAD_API_KEY", "change-this-secret-key")
 
 app = FastAPI(title="Coupon Validation API", version="2.0.0")
 
@@ -617,3 +621,59 @@ async def health():
     return {"status": "healthy"}
 
 
+# ---------------------------------------------------
+# COUPON FILE UPLOAD ENDPOINT (for Power Automate)
+# ---------------------------------------------------
+@app.post("/api/upload-coupons")
+async def upload_coupons(
+    file: UploadFile = File(...),
+    x_api_key: str = Header(None, alias="X-API-Key")
+):
+    """
+    Upload a new coupon file (xlsx or csv) to Cloud Storage.
+    Requires X-API-Key header for authentication.
+    Used by Power Automate to sync from SharePoint.
+    """
+    # Verify API key
+    if x_api_key != UPLOAD_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    # Validate file type
+    filename = file.filename.lower() if file.filename else ""
+    if not (filename.endswith('.xlsx') or filename.endswith('.csv')):
+        raise HTTPException(status_code=400, detail="File must be .xlsx or .csv")
+    
+    try:
+        from google.cloud import storage
+        
+        # Read file content
+        content = await file.read()
+        
+        # Upload to Cloud Storage
+        client = storage.Client()
+        bucket = client.bucket(COUPONS_GCS_BUCKET)
+        
+        # Determine blob name based on file type
+        blob_name = "coupons.xlsx" if filename.endswith('.xlsx') else "coupons.csv"
+        blob = bucket.blob(blob_name)
+        
+        # Set content type
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if filename.endswith('.xlsx') else "text/csv"
+        blob.upload_from_string(content, content_type=content_type)
+        
+        # Clear the coupon cache to force reload
+        global _coupon_cache, _coupon_cache_time
+        _coupon_cache = {}
+        _coupon_cache_time = None
+        
+        # Reload coupons to verify file is valid
+        coupons = load_coupons(force_refresh=True)
+        
+        return {
+            "status": "success",
+            "message": f"Uploaded {blob_name} to Cloud Storage",
+            "coupons_loaded": len(coupons)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
