@@ -630,7 +630,8 @@ async def upload_coupons(
     x_api_key: str = Header(None, alias="X-API-Key")
 ):
     """
-    Upload a new coupon file (xlsx or csv) to Cloud Storage.
+    Upload a new coupon file (xlsx or csv) directly to the API.
+    Saves locally and refreshes cache.
     Requires X-API-Key header for authentication.
     Used by Power Automate to sync from SharePoint.
     """
@@ -644,22 +645,17 @@ async def upload_coupons(
         raise HTTPException(status_code=400, detail="File must be .xlsx or .csv")
     
     try:
-        from google.cloud import storage
-        
         # Read file content
         content = await file.read()
         
-        # Upload to Cloud Storage
-        client = storage.Client()
-        bucket = client.bucket(COUPONS_GCS_BUCKET)
-        
-        # Determine blob name based on file type
-        blob_name = "coupons.xlsx" if filename.endswith('.xlsx') else "coupons.csv"
-        blob = bucket.blob(blob_name)
-        
-        # Set content type
-        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if filename.endswith('.xlsx') else "text/csv"
-        blob.upload_from_string(content, content_type=content_type)
+        # Save locally (will be used until next deploy)
+        if filename.endswith('.xlsx'):
+            save_path = COUPONS_XLSX_PATH
+        else:
+            save_path = COUPONS_CSV_PATH
+            
+        with open(save_path, 'wb') as f:
+            f.write(content)
         
         # Clear the coupon cache to force reload
         global _coupon_cache, _coupon_cache_time
@@ -671,7 +667,7 @@ async def upload_coupons(
         
         return {
             "status": "success",
-            "message": f"Uploaded {blob_name} to Cloud Storage",
+            "message": f"Uploaded and processed coupon file",
             "coupons_loaded": len(coupons)
         }
         
