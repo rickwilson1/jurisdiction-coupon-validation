@@ -1,0 +1,50 @@
+﻿Coupon,Program Status,Jurisdiction,Product,Start Date,End Date,%23 of Uses,Max. Quantity per Coupon,Delivery Cost,Website,Tools,Description,Jurisdiction Pricing
+CITYSACCOM25,Inactive,City of Sacramento,"[""Compost-100""]",4/1/25,9/8/25,2,3,$85.00 ,https://www.cityofsacramento.gov/public-works/recycling-solid-waste/compost_giveaway_program,https://experience.arcgis.com/experience/41cf1acd0fff431a8c30b7552a77ab5c#data_s=id%3Awidget_22_output_config_default_geocode_utility_1_0%3A0,,"$5/bag, $15/yard 
+"
+CITYVCOM26,Active,City of Ventura,"[""Compost-100""]",1/1/26,12/16/26,5,15,$135.00 ,https://www.cityofventura.ca.gov/2524/Free-Compost-Mulch-Program,,,
+CITYVCM26,Active,City of Ventura,"[""Cover Mulch""]",1/1/26,12/16/26,5,20,$135.00 ,https://www.cityofventura.ca.gov/2524/Free-Compost-Mulch-Program,,,
+COUVCOM26,Active,County of Ventura,"[""Compost-100""]",1/1/26,12/15/26,5,15,,https://ejharrison.com/free-compost-mulch-program/,https://maps.ventura.org/countyview/,"- For County View Map Tool (Address Verification) Please follow these instructions to use tool
+
+1. Click on Tools in Top-Right Corner
+2. Click Map Tab on Top-Left Corner
+3. Click Layer-List right below Map Tab
+4. Check ""Cities"" Box (This will provide City and County Lines)
+5. Click Navigation Tab on Top-Left
+6. Click Home
+7. Under ""Find a Location:"" Click ""Locate Address""
+8. Type in full address (Similar to how Google Maps displays the address"" then click search
+9. Click address ""Again make sure it is the correct address fully typed out""
+",
+COUVCM26,Active,County of Ventura,"[""Cover Mulch""]",1/1/26,12/15/26,5,20,,https://ejharrison.com/free-compost-mulch-program/,https://maps.ventura.org/countyview/,"- For County View Map Tool (Address Verification) Please follow these instructions to use tool
+
+1. Click on Tools in Top-Right Corner
+2. Click Map Tab on Top-Left Corner
+3. Click Layer-List right below Map Tab
+4. Check ""Cities"" Box (This will provide City and County Lines)
+5. Click Navigation Tab on Top-Left
+6. Click Home
+7. Under ""Find a Location:"" Click ""Locate Address""
+8. Type in full address (Similar to how Google Maps displays the address"" then click search
+9. Click address ""Again make sure it is the correct address fully typed out""
+",
+CITYOCOM26,Active,City of Oxnard,"[""Compost-100""]",1/1/26,12/15/26,5,15,$90.00 ,https://www.oxnard.gov/public-works/environmental-resources/free-compost-mulch-program,,,
+CITYOCM26,Active,City of Oxnard,"[""Cover Mulch""]",1/1/26,12/15/26,5,20,$90.00 ,https://www.oxnard.gov/public-works/environmental-resources/free-compost-mulch-program,,,
+CITYOSCCOM25,Inactive,City of Santa Clarita,"[""Compost-100""]",4/1/25,6/16/25,100,15,$200.00 ,https://greensantaclarita.com/free-compost-mulch-program/,https://maps.santa-clarita.com/portal/apps/webappviewer/index.html?id=4b3cfb271314475db6518999b4747876,**Unlimited # of uses per coupon**,
+CITYOSCCM25,Inactive,City of Santa Clarita,"[""Cover Mulch""]",4/1/25,6/16/25,100,20,$200.00 ,https://greensantaclarita.com/free-compost-mulch-program/,,*Unlimited Uses per Coupon*,
+CITYCAMCOM26,Active,City of Camarillo,"[""Compost-100""]",1/1/26,12/15/26,5,15,$90.00 ,https://www.ci.camarillo.ca.us/residents/trash___recycling/free_organics_program.php,https://camarillo.maps.arcgis.com/apps/instant/lookup/index.html?appid=01398f62aaf34a2b932ade6223cfdbe9,Delivery Cost can range from $90.00 - #135.00,
+CITYCAMCM26,Active,City of Camarillo,"[""Cover Mulch""]",1/1/26,12/15/26,5,20,$90.00 ,https://www.ci.camarillo.ca.us/residents/trash___recycling/free_organics_program.php,https://camarillo.maps.arcgis.com/apps/instant/lookup/index.html?appid=01398f62aaf34a2b932ade6223cfdbe9,Delivery Cost can range from $90.00 - #135.00,
+CITYSACCOMB25,Inactive,City of Sacramento ,"[""Other""]",6/1/25,9/8/25,2,10,,https://www.cityofsacramento.gov/public-works/recycling-solid-waste/compost_giveaway_program,https://experience.arcgis.com/experience/41cf1acd0fff431a8c30b7552a77ab5c#data_s=id%3Awidget_22_output_config_default_geocode_utility_1_0%3A0,"Valid date while supplies last.
+Pick up dates are Mon, Wed, & Fri from 9am-1pm.
+No pick ups Tues & Thurs designated for new bag shipments. 
+Saturdays no pick up available. ","$5/bag
+"
+CITYFCOM26,Active,City of Fillmore,"[""Compost-100""]",1/20/26,12/15/26,5,10,$135.00 ,https://www.fillmoreca.gov/DocumentCenter/View/1071/Agromin---City-of-Fillmore-Coupon-Program-2025,,,
+CITYFCM26,Active,City of Fillmore,"[""Cover Mulch""]",1/20/26,12/15/26,5,10,$135.00 ,https://www.fillmoreca.gov/DocumentCenter/View/1071/Agromin---City-of-Fillmore-Coupon-Program-2025,,,
+FAIRFIELDCOM25,Inactive,City of Fairfield,"[""Compost-100""]",10/13/25,11/8/25,1,10,,https://www.fairfield.ca.gov/sb1383,,1 coupon use per residence- Bags OR Bulk,
+FAIRFIELDCOMB25,Inactive,City of Fairfield,"[""Other""]",10/13/25,11/8/25,1,10,,https://www.fairfield.ca.gov/sb1383,,"10 Bag Max
+Coupon valid for Bag OR Bulk- 1 use",
+CITYDCOM25,Inactive,City of Dixon,"[""Compost-100""]",10/13/25,11/8/25,2,8,$150.00 ,https://www.cityofdixonca.gov/departments/PublicWorks/compostgiveaway,https://solanocountygis.com/portal/apps/webappviewer/index.html?id=d4090bcafe06473daa4db536cffac1cc,,
+CITYOJAICOMB26,Active,City of Ojai,"[""Compost Bags""]",1/1/26,12/15/26,1,5,,https://www.ojairec.com/607/Compost-and-Mulch-Program,/:x:/r/personal/jessica_agromin_com/_layouts/15/Doc.aspx?sourcedoc=%7B2B985B8D-F512-43E0-B06D-34499FDDE78F%7D&file=City%20of%20Ojai%20Coupon%20Program%20Workbook-SALES-2025.xlsx&action=default&mobileredirect=true,Bags will be picked up at Aqua-Flo in Ojai,$6/bag
+CITYOJAICOM26,Active,City of Ojai,"[""Compost-100""]",1/1/26,12/31/26,2,15,$270.00 ,https://www.ojairec.com/607/Compost-and-Mulch-Program,/:x:/r/personal/jessica_agromin_com/_layouts/15/Doc.aspx?sourcedoc=%7B2B985B8D-F512-43E0-B06D-34499FDDE78F%7D&file=City%20of%20Ojai%20Coupon%20Program%20Workbook-SALES-2025.xlsx&action=default&mobileredirect=true,,
+CITYOJAICM26,Active,City of Ojai,"[""Cover Mulch""]",1/1/26,12/15/26,2,20,$270.00 ,https://www.ojairec.com/607/Compost-and-Mulch-Program,/:x:/r/personal/jessica_agromin_com/_layouts/15/Doc.aspx?sourcedoc=%7B2B985B8D-F512-43E0-B06D-34499FDDE78F%7D&file=City%20of%20Ojai%20Coupon%20Program%20Workbook-SALES-2025.xlsx&action=default&mobileredirect=true,,
+CITYVBCOM26,Active,City of Ventura,"[""Compost Bags""]",2/13/26,12/16/26,2,10,,,,,

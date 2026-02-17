@@ -5,16 +5,22 @@ from fastapi.responses import HTMLResponse
 from shapely.geometry import Point
 import os
 import re
+import csv
 from functools import lru_cache
+from datetime import datetime, date
+from io import StringIO
 
 # ---------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------
 SHAPEFILE_PATH = os.path.join(os.path.dirname(__file__), "CDTFA_TaxDistricts.gpkg")
+COUPONS_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
-LOGO_PATH = os.path.join(os.path.dirname(__file__), "agromin_logo.png")
 
-app = FastAPI(title="Jurisdiction Validation API", version="1.0.0")
+# Cloud Storage URL (for production - update after uploading)
+COUPONS_GCS_URL = os.environ.get("COUPONS_URL", "")
+
+app = FastAPI(title="Coupon Validation API", version="2.0.0")
 
 # ---------------------------------------------------
 # DATA LOADING (cached at startup)
@@ -28,10 +34,105 @@ def load_tax_districts():
     gdf = gdf.to_crs(epsg=4326)
     return gdf
 
+# ---------------------------------------------------
+# COUPON DATA LOADING
+# ---------------------------------------------------
+_coupon_cache = {}
+_coupon_cache_time = None
+
+def load_coupons(force_refresh: bool = False) -> dict:
+    """
+    Load coupon data from CSV (local or Cloud Storage).
+    Returns dict keyed by coupon code.
+    Caches for 5 minutes to allow updates without redeploy.
+    """
+    global _coupon_cache, _coupon_cache_time
+    
+    # Check cache (5 minute TTL)
+    if not force_refresh and _coupon_cache and _coupon_cache_time:
+        age = (datetime.now() - _coupon_cache_time).seconds
+        if age < 300:  # 5 minutes
+            return _coupon_cache
+    
+    coupons = {}
+    csv_content = None
+    
+    # Try Cloud Storage first
+    if COUPONS_GCS_URL:
+        try:
+            r = requests.get(COUPONS_GCS_URL, timeout=10)
+            r.raise_for_status()
+            csv_content = r.text
+        except Exception:
+            pass  # Fall back to local file
+    
+    # Fall back to local file
+    if not csv_content and os.path.exists(COUPONS_PATH):
+        with open(COUPONS_PATH, 'r', encoding='utf-8') as f:
+            csv_content = f.read()
+    
+    if not csv_content:
+        return {}
+    
+    # Parse CSV
+    reader = csv.DictReader(StringIO(csv_content))
+    for row in reader:
+        code = row.get('Coupon', '').strip().upper()
+        if code:
+            coupons[code] = {
+                'code': code,
+                'status': row.get('Program Status', '').strip(),
+                'jurisdiction': row.get('Jurisdiction', '').strip(),
+                'product': row.get('Product', '').strip(),
+                'start_date': parse_date(row.get('Start Date', '')),
+                'end_date': parse_date(row.get('End Date', '')),
+                'max_uses': row.get('%23 of Uses', '').strip(),
+                'max_quantity': row.get('Max. Quantity per Coupon', '').strip(),
+                'delivery_cost': row.get('Delivery Cost', '').strip(),
+                'website': row.get('Website', '').strip(),
+            }
+    
+    _coupon_cache = coupons
+    _coupon_cache_time = datetime.now()
+    return coupons
+
+
+def parse_date(date_str: str) -> date | None:
+    """Parse date string in M/D/YY format."""
+    if not date_str:
+        return None
+    try:
+        date_str = date_str.strip()
+        # Handle M/D/YY format
+        return datetime.strptime(date_str, "%m/%d/%y").date()
+    except ValueError:
+        try:
+            # Try M/D/YYYY format
+            return datetime.strptime(date_str, "%m/%d/%Y").date()
+        except ValueError:
+            return None
+
+
+def validate_coupon_dates(coupon: dict) -> tuple[bool, str]:
+    """Check if coupon is within valid date range."""
+    today = date.today()
+    start = coupon.get('start_date')
+    end = coupon.get('end_date')
+    
+    if start and today < start:
+        return False, f"Coupon not yet active (starts {start.strftime('%m/%d/%Y')})"
+    
+    if end and today > end:
+        return False, f"Coupon expired (ended {end.strftime('%m/%d/%Y')})"
+    
+    return True, "Valid"
+
+
 # Pre-load on startup
 @app.on_event("startup")
 async def startup_event():
     load_tax_districts()
+    load_coupons()
 
 # ---------------------------------------------------
 # HELPERS
@@ -178,13 +279,127 @@ async def validate_jurisdiction(
 
 
 # ---------------------------------------------------
+# COUPON VALIDATION ENDPOINT
+# ---------------------------------------------------
+@app.get("/api/validate-coupon")
+async def validate_coupon(
+    address: str = Query(..., description="Full California address"),
+    coupon: str = Query(..., description="Coupon code")
+):
+    """
+    Validate if a coupon is valid for the given address.
+    
+    Checks:
+    1. Coupon exists
+    2. Coupon is Active
+    3. Current date is within Start/End date range
+    4. Address is within the coupon's jurisdiction
+    
+    Returns:
+    - status: "accepted", "denied", or "error"
+    - coupon: the coupon code
+    - jurisdiction: the coupon's jurisdiction
+    - reason: explanation of the result
+    """
+    try:
+        # Normalize coupon code
+        coupon_code = coupon.strip().upper()
+        
+        # Load coupon data
+        coupons = load_coupons()
+        
+        # Check if coupon exists
+        if coupon_code not in coupons:
+            return {
+                "status": "denied",
+                "coupon": coupon_code,
+                "reason": "Coupon code not found"
+            }
+        
+        coupon_data = coupons[coupon_code]
+        
+        # Check if coupon is active
+        if coupon_data['status'].lower() != 'active':
+            return {
+                "status": "denied",
+                "coupon": coupon_code,
+                "jurisdiction": coupon_data['jurisdiction'],
+                "reason": f"Coupon is {coupon_data['status']}"
+            }
+        
+        # Check date validity
+        date_valid, date_reason = validate_coupon_dates(coupon_data)
+        if not date_valid:
+            return {
+                "status": "denied",
+                "coupon": coupon_code,
+                "jurisdiction": coupon_data['jurisdiction'],
+                "reason": date_reason
+            }
+        
+        # Geocode the address
+        lat, lon, matched_address = geocode_address(address)
+        
+        if lat is None or lon is None:
+            return {
+                "status": "error",
+                "coupon": coupon_code,
+                "reason": "Address could not be geocoded"
+            }
+        
+        # Find tax district
+        gdf = load_tax_districts()
+        district = find_tax_district(lat, lon, gdf)
+        
+        if not district:
+            return {
+                "status": "error",
+                "coupon": coupon_code,
+                "reason": "Address not found in California tax district data"
+            }
+        
+        # Compare jurisdictions
+        claimed_jurisdiction = coupon_data['jurisdiction']
+        match, actual = jurisdictions_match(
+            claimed_jurisdiction,
+            district.get("city"),
+            district.get("county")
+        )
+        
+        if match:
+            return {
+                "status": "accepted",
+                "coupon": coupon_code,
+                "jurisdiction": claimed_jurisdiction,
+                "matched_address": matched_address,
+                "reason": "Address is within coupon jurisdiction"
+            }
+        else:
+            return {
+                "status": "denied",
+                "coupon": coupon_code,
+                "jurisdiction": claimed_jurisdiction,
+                "actual_jurisdiction": actual,
+                "matched_address": matched_address,
+                "reason": f"Address is in {actual}, not {claimed_jurisdiction}"
+            }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "coupon": coupon,
+            "reason": str(e)
+        }
+
+
+# ---------------------------------------------------
 # WEB FORM (for manual lookups)
 # ---------------------------------------------------
 HTML_FORM = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Jurisdiction Validation</title>
+    <title>Coupon Validation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
@@ -262,18 +477,18 @@ HTML_FORM = """
         .result-label {
             font-weight: 600;
         }
-        .examples {
+        .info {
             margin-top: 30px;
             padding: 15px;
             background: #f8f9fa;
             border-radius: 5px;
             font-size: 14px;
         }
-        .examples h3 {
+        .info h3 {
             margin-top: 0;
             color: #666;
         }
-        .examples code {
+        .info code {
             background: #e9ecef;
             padding: 2px 6px;
             border-radius: 3px;
@@ -282,25 +497,29 @@ HTML_FORM = """
 </head>
 <body>
     <div class="container">
-        <h1>Jurisdiction Validation</h1>
-        <p class="subtitle">Coupon Code Qualification Check</p>
+        <h1>Coupon Validation</h1>
+        <p class="subtitle">Verify coupon eligibility for delivery address</p>
         
         <form id="validateForm">
-            <label for="address">Address</label>
-            <input type="text" id="address" name="address" placeholder="123 Main St, Sacramento, CA 95814" required>
+            <label for="coupon">Coupon Code</label>
+            <input type="text" id="coupon" name="coupon" placeholder="CITYVCOM26" required>
             
-            <label for="jurisdiction">Claimed Jurisdiction</label>
-            <input type="text" id="jurisdiction" name="jurisdiction" placeholder="City of Sacramento" required>
+            <label for="address">Delivery Address</label>
+            <input type="text" id="address" name="address" placeholder="123 Main St, Ventura, CA 93001" required>
             
-            <button type="submit">Validate</button>
+            <button type="submit">Validate Coupon</button>
         </form>
         
         <div id="result"></div>
         
-        <div class="examples">
-            <h3>Jurisdiction Format Examples</h3>
-            <p><strong>Cities:</strong> <code>City of Sacramento</code>, <code>Sacramento, City of</code></p>
-            <p><strong>Counties:</strong> <code>Sacramento County</code>, <code>County of Sacramento</code></p>
+        <div class="info">
+            <h3>What this checks:</h3>
+            <ul>
+                <li>Coupon code exists</li>
+                <li>Coupon is currently active</li>
+                <li>Today's date is within the valid period</li>
+                <li>Address is within the coupon's jurisdiction</li>
+            </ul>
         </div>
     </div>
     
@@ -308,27 +527,33 @@ HTML_FORM = """
         document.getElementById('validateForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const coupon = document.getElementById('coupon').value;
             const address = document.getElementById('address').value;
-            const jurisdiction = document.getElementById('jurisdiction').value;
             
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = '<p>Validating...</p>';
             
             try {
-                const params = new URLSearchParams({ address, jurisdiction });
-                const response = await fetch(`/api/validate?${params}`);
+                const params = new URLSearchParams({ address, coupon });
+                const response = await fetch(`/api/validate-coupon?${params}`);
                 const data = await response.json();
                 
                 let statusClass = data.status;
                 let html = `<div class="result ${statusClass}">`;
                 html += `<div class="result-item"><span class="result-label">Status:</span> ${data.status.toUpperCase()}</div>`;
+                html += `<div class="result-item"><span class="result-label">Coupon:</span> ${data.coupon}</div>`;
                 
-                if (data.status !== 'error') {
-                    html += `<div class="result-item"><span class="result-label">Claimed:</span> ${data.claimed_jurisdiction}</div>`;
-                    html += `<div class="result-item"><span class="result-label">Actual:</span> ${data.actual_jurisdiction}</div>`;
+                if (data.jurisdiction) {
+                    html += `<div class="result-item"><span class="result-label">Jurisdiction:</span> ${data.jurisdiction}</div>`;
+                }
+                if (data.actual_jurisdiction) {
+                    html += `<div class="result-item"><span class="result-label">Address Location:</span> ${data.actual_jurisdiction}</div>`;
+                }
+                if (data.matched_address) {
                     html += `<div class="result-item"><span class="result-label">Matched Address:</span> ${data.matched_address}</div>`;
-                } else {
-                    html += `<div class="result-item"><span class="result-label">Error:</span> ${data.message}</div>`;
+                }
+                if (data.reason) {
+                    html += `<div class="result-item"><span class="result-label">Reason:</span> ${data.reason}</div>`;
                 }
                 
                 html += '</div>';
