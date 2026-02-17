@@ -1,101 +1,104 @@
 ================================================================================
-         JURISDICTION VALIDATION API - INTEGRATION SUMMARY
-                      For CIMcloud Developer
+              COUPON VALIDATION API - INTEGRATION SUMMARY
+                        For CIMcloud Developer
 ================================================================================
 
 PURPOSE
 -------
-Validate whether a customer's address is within a claimed jurisdiction 
-(city or county) for coupon eligibility.
+Validate whether a coupon code is valid for a customer's delivery address.
+Checks coupon status, date validity, and jurisdiction match.
 
 
 ENDPOINT
 --------
-GET https://tax-lookup-904065377096.us-west1.run.app/api/validate
+GET https://coupon-validator-751008504644.us-west1.run.app/api/validate-coupon
 
 
 REQUEST PARAMETERS
 ------------------
-Parameter      Type      Required    Description
------------    ------    --------    -----------
-address        string    Yes         Full California address
-jurisdiction   string    Yes         Claimed jurisdiction (see formats below)
-
-
-JURISDICTION INPUT FORMATS
---------------------------
-The API accepts various formats and normalizes them automatically:
-
-FOR CITIES (include "City" anywhere in the string):
-  - "City of Sacramento"
-  - "Sacramento, City of"
-  - "Sacramento City"
-
-FOR COUNTIES (no "City" in the string):
-  - "Sacramento"
-  - "Sacramento County"
-  - "County of Sacramento"
-
-Note: Matching is case-insensitive.
+Parameter    Type      Required    Description
+---------    ------    --------    -----------
+address      string    Yes         Full California delivery address
+coupon       string    Yes         Coupon code (case-insensitive)
 
 
 EXAMPLE REQUESTS
 ----------------
 
-City validation:
-GET /api/validate?address=123+Main+St,+Sacramento,+CA+95814&jurisdiction=City+of+Sacramento
-GET /api/validate?address=123+Main+St,+Sacramento,+CA+95814&jurisdiction=Sacramento,+City+of
+Valid coupon for Ventura address:
+GET /api/validate-coupon?address=501+Poli+St,+Ventura,+CA+93001&coupon=CITYVCOM26
 
-County validation:
-GET /api/validate?address=456+Oak+Ave,+Sacramento,+CA+95828&jurisdiction=Sacramento+County
-GET /api/validate?address=456+Oak+Ave,+Sacramento,+CA+95828&jurisdiction=County+of+Sacramento
+Invalid coupon (wrong jurisdiction):
+GET /api/validate-coupon?address=1515+S+St,+Sacramento,+CA+95811&coupon=CITYVCOM26
 
 
 RESPONSE FORMAT
 ---------------
 
-Success - Match:
+Success - Accepted:
 {
   "status": "accepted",
-  "claimed_jurisdiction": "City of Sacramento",
-  "actual_jurisdiction": "Sacramento",
-  "matched_address": "123 Main Street, Sacramento, California, 95814"
+  "coupon": "CITYVCOM26",
+  "jurisdiction": "City of Ventura",
+  "matched_address": "501 Poli St, Ventura, California, 93001",
+  "reason": "Address is within coupon jurisdiction"
 }
 
-Success - No Match:
+Denied - Wrong jurisdiction:
 {
   "status": "denied",
-  "claimed_jurisdiction": "City of Sacramento",
-  "actual_jurisdiction": "Elk Grove",
-  "matched_address": "123 Main Street, Elk Grove, California, 95624"
+  "coupon": "CITYVCOM26",
+  "jurisdiction": "City of Ventura",
+  "actual_jurisdiction": "SACRAMENTO",
+  "matched_address": "1515 S St, Sacramento, California, 95811",
+  "reason": "Address is in SACRAMENTO, not City of Ventura"
+}
+
+Denied - Coupon not found:
+{
+  "status": "denied",
+  "coupon": "INVALIDCODE",
+  "reason": "Coupon code not found"
+}
+
+Denied - Coupon inactive:
+{
+  "status": "denied",
+  "coupon": "CITYSACCOM25",
+  "jurisdiction": "City of Sacramento",
+  "reason": "Coupon is Inactive"
+}
+
+Denied - Coupon expired:
+{
+  "status": "denied",
+  "coupon": "CITYSACCOM25",
+  "jurisdiction": "City of Sacramento",
+  "reason": "Coupon expired (ended 09/08/2025)"
+}
+
+Denied - Coupon not yet active:
+{
+  "status": "denied",
+  "coupon": "FUTURECOUPON",
+  "jurisdiction": "City of Example",
+  "reason": "Coupon not yet active (starts 01/01/2027)"
 }
 
 Error - Address not found:
 {
   "status": "error",
-  "message": "Address could not be geocoded"
-}
-
-Error - Outside jurisdiction data:
-{
-  "status": "error",
-  "message": "Address not found in California tax district data"
+  "coupon": "CITYVCOM26",
+  "reason": "Address could not be geocoded"
 }
 
 
-MATCHING RULES
---------------
-1. If "city" appears anywhere in the jurisdiction string:
-   - API checks if address is within CITY boundaries
-   
-2. If "city" does NOT appear (or "county" appears):
-   - API checks if address is within COUNTY boundaries
-
-3. Normalization removes these strings before comparison:
-   - "city of", ", city of", "city"
-   - "county of", ", county of", "county"
-
-4. Comparison is case-insensitive
+VALIDATION CHECKS (in order)
+----------------------------
+1. Coupon code exists in the system
+2. Coupon status is "Active"
+3. Today's date is within Start Date and End Date
+4. Delivery address is within coupon's jurisdiction
 
 
 AUTHENTICATION
@@ -115,10 +118,20 @@ RATE LIMITS
 None.
 
 
+LEGACY ENDPOINT
+---------------
+The original jurisdiction-based endpoint is still available:
+
+GET /api/validate?address=...&jurisdiction=City+of+Sacramento
+
+This validates an address against a specified jurisdiction name
+(useful for testing or manual lookups).
+
+
 WEB INTERFACE
 -------------
-A simple web form is also available at the root URL for manual lookups:
-https://tax-lookup-904065377096.us-west1.run.app/
+A web form for manual coupon validation is available at:
+https://coupon-validator-751008504644.us-west1.run.app/
 
 
 CONTACT

@@ -17,8 +17,8 @@ SHAPEFILE_PATH = os.path.join(os.path.dirname(__file__), "CDTFA_TaxDistricts.gpk
 COUPONS_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
 
-# Cloud Storage URL (for production - update after uploading)
-COUPONS_GCS_URL = os.environ.get("COUPONS_URL", "")
+# Cloud Storage URL (for production - allows updating coupons without redeploy)
+COUPONS_GCS_URL = os.environ.get("COUPONS_URL", "https://storage.googleapis.com/agromin-coupon-data/coupons.csv")
 
 app = FastAPI(title="Coupon Validation API", version="2.0.0")
 
@@ -582,3 +582,5 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+
