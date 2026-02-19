@@ -22,6 +22,20 @@ address      string    Yes         Full California delivery address
 coupon       string    Yes         Coupon code (case-insensitive)
 
 
+CIMCLOUD ADDRESS SELECTION
+--------------------------
+Each CIMcloud transaction has two addresses: Billing and Shipping.
+The address sent to the API depends on the customer's delivery option:
+
+  Shipping Option              Address to Validate
+  ---------------              -------------------
+  "Ship to my address"    -->  Use SHIPPING address
+  "Pick up at our office" -->  Use BILLING address
+
+Note: The Billing address is always present (even for $0 transactions).
+The Shipping address is only relevant when delivery is selected.
+
+
 EXAMPLE REQUESTS
 ----------------
 
