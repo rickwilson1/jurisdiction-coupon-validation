@@ -535,13 +535,13 @@ HTML_FORM = """
 <body>
     <div class="container">
         <h1>Coupon Validation</h1>
-        <p class="subtitle">Verify coupon eligibility for delivery address</p>
+        <p class="subtitle">Verify coupon eligibility for address</p>
         
         <form id="validateForm">
             <label for="coupon">Coupon Code</label>
             <input type="text" id="coupon" name="coupon" placeholder="CITYVCOM26" required>
             
-            <label for="address">Delivery Address</label>
+            <label for="address">Address</label>
             <input type="text" id="address" name="address" placeholder="123 Main St, Ventura, CA 93001" required>
             
             <button type="submit">Validate Coupon</button>
@@ -626,30 +626,38 @@ async def health():
 # ---------------------------------------------------
 @app.post("/api/upload-coupons")
 async def upload_coupons(
-    file: UploadFile = File(...),
-    x_api_key: str = Header(None, alias="X-API-Key")
+    file: UploadFile = File(None),
+    x_api_key: str = Header(None, alias="X-API-Key"),
+    request: Request = None
 ):
     """
     Upload a new coupon file (xlsx or csv) directly to the API.
     Saves locally and refreshes cache.
     Requires X-API-Key header for authentication.
     Used by Power Automate to sync from SharePoint.
+    
+    Accepts both multipart form uploads and raw binary data.
     """
     # Verify API key
     if x_api_key != UPLOAD_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    # Validate file type
-    filename = file.filename.lower() if file.filename else ""
-    if not (filename.endswith('.xlsx') or filename.endswith('.csv')):
-        raise HTTPException(status_code=400, detail="File must be .xlsx or .csv")
-    
     try:
-        # Read file content
-        content = await file.read()
+        # Get file content - either from form upload or raw body
+        if file and file.filename:
+            content = await file.read()
+            filename = file.filename.lower()
+        else:
+            # Raw binary upload from Power Automate
+            content = await request.body()
+            # Default to xlsx since that's what SharePoint sends
+            filename = "coupons.xlsx"
         
-        # Save locally (will be used until next deploy)
-        if filename.endswith('.xlsx'):
+        if not content:
+            raise HTTPException(status_code=400, detail="No file content received")
+        
+        # Determine file type from content (Excel files start with PK)
+        if content[:2] == b'PK':
             save_path = COUPONS_XLSX_PATH
         else:
             save_path = COUPONS_CSV_PATH
@@ -671,5 +679,7 @@ async def upload_coupons(
             "coupons_loaded": len(coupons)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
