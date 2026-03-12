@@ -3,6 +3,7 @@ import geopandas as gpd
 import pandas as pd
 from fastapi import FastAPI, Query, Request, UploadFile, File, Header, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from shapely.geometry import Point
 import os
 import re
@@ -29,6 +30,19 @@ COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", f"https://storage.google
 UPLOAD_API_KEY = os.environ.get("UPLOAD_API_KEY", "change-this-secret-key")
 
 app = FastAPI(title="Coupon Validation API", version="2.0.0")
+
+# CORS configuration for browser-based clients (e.g., CIMcloud frontend)
+_cors_origins = os.environ.get(
+    "CORS_ALLOW_ORIGINS",
+    "https://commercial.agromin.cimlocal.com"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in _cors_origins.split(",") if origin.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------------------------------------------------
 # DATA LOADING (cached at startup)
