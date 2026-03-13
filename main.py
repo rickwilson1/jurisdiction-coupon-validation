@@ -36,9 +36,14 @@ _cors_origins = os.environ.get(
     "CORS_ALLOW_ORIGINS",
     "https://commercial.agromin.cimlocal.com"
 )
+_cors_origin_regex = os.environ.get(
+    "CORS_ALLOW_ORIGIN_REGEX",
+    r"^https://([a-z0-9-]+\.)?agromin\.cimlocal\.com$|^https://([a-z0-9-]+\.)?agromin\.mycimstaging\.com$|^https://([a-z0-9-]+\.)?agromin\.cimstaging\.com$"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in _cors_origins.split(",") if origin.strip()],
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
