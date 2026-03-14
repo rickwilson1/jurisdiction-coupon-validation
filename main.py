@@ -255,6 +255,21 @@ def is_city_claim(jurisdiction: str) -> bool:
     return 'city' in jurisdiction.lower()
 
 
+def is_unincorporated_area(city_name: str | None) -> bool:
+    """
+    Return True when the address is in an unincorporated area.
+    Empty/missing city is treated as unincorporated.
+    """
+    if city_name is None:
+        return True
+
+    normalized_city = str(city_name).strip().lower()
+    if not normalized_city:
+        return True
+
+    return "unincorporated" in normalized_city
+
+
 def jurisdictions_match(claimed: str, actual_city: str, actual_county: str) -> tuple:
     """
     Compare claimed jurisdiction against actual city/county.
@@ -269,10 +284,17 @@ def jurisdictions_match(claimed: str, actual_city: str, actual_county: str) -> t
             return normalized_claim == normalized_actual, actual_city
         return False, actual_county or "Unincorporated area"
     else:
-        # Must match county
+        # County coupons are valid only in unincorporated county areas.
         if actual_county:
             normalized_actual = normalize_jurisdiction(actual_county)
-            return normalized_claim == normalized_actual, actual_county
+            county_matches = normalized_claim == normalized_actual
+            if not county_matches:
+                return False, actual_county
+
+            if not is_unincorporated_area(actual_city):
+                return False, actual_city
+
+            return True, actual_county
         return False, "Unknown"
 
 
