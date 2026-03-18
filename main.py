@@ -34,11 +34,11 @@ app = FastAPI(title="Coupon Validation API", version="2.0.0")
 # CORS configuration for browser-based clients (e.g., CIMcloud frontend)
 _cors_origins = os.environ.get(
     "CORS_ALLOW_ORIGINS",
-    "https://commercial.agromin.cimlocal.com,https://agromin.cimproduction.com,https://shop.agromin.com"
+    "https://commercial.agromin.cimlocal.com,https://shop.agromin.com"
 )
 _cors_origin_regex = os.environ.get(
     "CORS_ALLOW_ORIGIN_REGEX",
-    r"^https://([a-z0-9-]+\.)?agromin\.cimlocal\.com$|^https://([a-z0-9-]+\.)?agromin\.cimproduction\.com$|^https://([a-z0-9-]+\.)?agromin\.mycimstaging\.com$|^https://([a-z0-9-]+\.)?agromin\.cimstaging\.com$"
+    r"^https://([a-z0-9-]+\.)?agromin\.cimlocal\.com$|^https://([a-z0-9-]+\.)?agromin\.mycimstaging\.com$|^https://([a-z0-9-]+\.)?agromin\.cimstaging\.com$"
 )
 app.add_middleware(
     CORSMiddleware,
