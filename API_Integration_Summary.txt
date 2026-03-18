@@ -112,7 +112,10 @@ VALIDATION CHECKS (in order)
 1. Coupon code exists in the system
 2. Coupon status is "Active"
 3. Today's date is within Start Date and End Date
-4. Delivery address is within coupon's jurisdiction
+4. Jurisdiction rule check:
+   - City coupons: address must be in that city
+   - County coupons: address must be in the county AND in an unincorporated area
+     (addresses inside incorporated cities are denied for county coupons)
 
 
 AUTHENTICATION
@@ -138,13 +141,19 @@ None.
 
 CORS (Browser Clients)
 ----------------------
-The API is configured for browser-based calls from CIMcloud.
+The API is configured for browser-based calls from Agromin/CIM browser clients.
 
-Allowed origin:
-  https://commercial.agromin.cimlocal.com
+Explicit allowed origins:
+  https://commercial.agromin.com
+  https://shop.agromin.com
+
+Regex allowed origins:
+  https://*.agromin.com
+  https://*.agromin.mycimstaging.com
+  https://*.agromin.cimstaging.com
 
 Response headers include:
-  Access-Control-Allow-Origin: https://commercial.agromin.cimlocal.com
+  Access-Control-Allow-Origin: <matching origin>
   Access-Control-Allow-Credentials: true
 
 If CORS errors persist in browser tests:
