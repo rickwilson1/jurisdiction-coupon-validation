@@ -20,8 +20,7 @@ COUPONS_CSV_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 COUPONS_XLSX_PATH = os.path.join(os.path.dirname(__file__), "coupons.xlsx")
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
 
-# Cloud Storage URLs (for production - allows updating coupons without redeploy)
-# API checks xlsx first, then csv
+# Cloud Storage URLs (fallback source for coupon files)
 COUPONS_GCS_BUCKET = os.environ.get("COUPONS_BUCKET", "agromin-coupon-data")
 COUPONS_GCS_XLSX_URL = os.environ.get("COUPONS_XLSX_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.xlsx")
 COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.csv")
@@ -69,7 +68,7 @@ _coupon_cache_time = None
 
 def load_coupons(force_refresh: bool = False) -> dict:
     """
-    Load coupon data from XLSX or CSV (Cloud Storage or local).
+    Load coupon data from XLSX or CSV (local first, then Cloud Storage).
     Returns dict keyed by coupon code.
     Caches for 5 minutes to allow updates without redeploy.
     Tries xlsx first, then falls back to csv.
@@ -84,35 +83,33 @@ def load_coupons(force_refresh: bool = False) -> dict:
     
     df = None
     
-    # Try Cloud Storage XLSX first
-    if COUPONS_GCS_XLSX_URL:
-        try:
-            r = requests.get(COUPONS_GCS_XLSX_URL, timeout=10)
-            r.raise_for_status()
-            df = pd.read_excel(BytesIO(r.content), engine='openpyxl')
-        except Exception:
-            pass  # Try CSV next
-    
-    # Try Cloud Storage CSV
-    if df is None and COUPONS_GCS_CSV_URL:
-        try:
-            r = requests.get(COUPONS_GCS_CSV_URL, timeout=10)
-            r.raise_for_status()
-            df = pd.read_csv(StringIO(r.text))
-        except Exception:
-            pass  # Fall back to local files
-    
-    # Fall back to local XLSX
-    if df is None and os.path.exists(COUPONS_XLSX_PATH):
+    # Prefer locally uploaded files so admin uploads take effect immediately.
+    if os.path.exists(COUPONS_XLSX_PATH):
         try:
             df = pd.read_excel(COUPONS_XLSX_PATH, engine='openpyxl')
         except Exception:
             pass
     
-    # Fall back to local CSV
     if df is None and os.path.exists(COUPONS_CSV_PATH):
         try:
             df = pd.read_csv(COUPONS_CSV_PATH)
+        except Exception:
+            pass
+    
+    # Fall back to Cloud Storage XLSX
+    if df is None and COUPONS_GCS_XLSX_URL:
+        try:
+            r = requests.get(COUPONS_GCS_XLSX_URL, timeout=10)
+            r.raise_for_status()
+            df = pd.read_excel(BytesIO(r.content), engine='openpyxl')
+        except Exception:
+            pass
+    
+    if df is None and COUPONS_GCS_CSV_URL:
+        try:
+            r = requests.get(COUPONS_GCS_CSV_URL, timeout=10)
+            r.raise_for_status()
+            df = pd.read_csv(StringIO(r.text))
         except Exception:
             pass
     
