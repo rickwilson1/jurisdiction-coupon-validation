@@ -12,6 +12,7 @@ import logging
 from functools import lru_cache
 from datetime import datetime, date
 from io import StringIO, BytesIO
+from google.cloud import storage as gcs_storage
 
 logger = logging.getLogger(__name__)
 
@@ -671,6 +672,23 @@ async def health():
 
 
 # ---------------------------------------------------
+# GCS SYNC HELPER
+# ---------------------------------------------------
+def _sync_to_gcs(content: bytes, blob_name: str):
+    """Best-effort upload to GCS so new container instances get the latest data."""
+    try:
+        client = gcs_storage.Client()
+        bucket = client.bucket(COUPONS_GCS_BUCKET)
+        blob = bucket.blob(blob_name)
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if blob_name.endswith(".xlsx") else "text/csv"
+        blob.cache_control = "no-cache, max-age=0"
+        blob.upload_from_string(content, content_type=content_type)
+        logger.info("Synced %s to GCS bucket %s", blob_name, COUPONS_GCS_BUCKET)
+    except Exception as e:
+        logger.warning("GCS sync failed (non-fatal): %s", e)
+
+
+# ---------------------------------------------------
 # COUPON FILE UPLOAD ENDPOINT (for Power Automate)
 # ---------------------------------------------------
 @app.post("/api/upload-coupons")
@@ -681,7 +699,7 @@ async def upload_coupons(
 ):
     """
     Upload a new coupon file (xlsx or csv) directly to the API.
-    Saves locally and refreshes cache.
+    Saves locally, syncs to GCS, and refreshes cache.
     Requires X-API-Key header for authentication.
     Used by Power Automate to sync from SharePoint.
     
@@ -706,13 +724,18 @@ async def upload_coupons(
             raise HTTPException(status_code=400, detail="No file content received")
         
         # Determine file type from content (Excel files start with PK)
-        if content[:2] == b'PK':
+        is_excel = content[:2] == b'PK'
+        if is_excel:
             save_path = COUPONS_XLSX_PATH
+            gcs_blob_name = "coupons.xlsx"
         else:
             save_path = COUPONS_CSV_PATH
+            gcs_blob_name = "coupons.csv"
             
         with open(save_path, 'wb') as f:
             f.write(content)
+        
+        _sync_to_gcs(content, gcs_blob_name)
         
         # Clear the coupon cache to force reload
         global _coupon_cache, _coupon_cache_time
