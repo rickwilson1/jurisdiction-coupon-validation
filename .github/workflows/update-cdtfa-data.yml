@@ -74,7 +74,7 @@ jobs:
       - name: Deploy to Cloud Run
         if: steps.check_changes.outputs.changed == 'true'
         run: |
-          gcloud run deploy tax-lookup \
+          gcloud run deploy coupon-validator \
             --source . \
             --region us-west1 \
             --allow-unauthenticated \
