@@ -8,9 +8,12 @@ from shapely.geometry import Point
 import os
 import re
 import csv
+import logging
 from functools import lru_cache
 from datetime import datetime, date
 from io import StringIO, BytesIO
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------
 # CONFIGURATION
@@ -83,16 +86,20 @@ def load_coupons(force_refresh: bool = False) -> dict:
     
     df = None
     
+    source = None
+
     # Prefer locally uploaded files so admin uploads take effect immediately.
     if os.path.exists(COUPONS_XLSX_PATH):
         try:
             df = pd.read_excel(COUPONS_XLSX_PATH, engine='openpyxl')
+            source = f"local file {COUPONS_XLSX_PATH}"
         except Exception:
             pass
     
     if df is None and os.path.exists(COUPONS_CSV_PATH):
         try:
             df = pd.read_csv(COUPONS_CSV_PATH)
+            source = f"local file {COUPONS_CSV_PATH}"
         except Exception:
             pass
     
@@ -102,6 +109,7 @@ def load_coupons(force_refresh: bool = False) -> dict:
             r = requests.get(COUPONS_GCS_XLSX_URL, timeout=10)
             r.raise_for_status()
             df = pd.read_excel(BytesIO(r.content), engine='openpyxl')
+            source = f"GCS {COUPONS_GCS_XLSX_URL}"
         except Exception:
             pass
     
@@ -110,10 +118,12 @@ def load_coupons(force_refresh: bool = False) -> dict:
             r = requests.get(COUPONS_GCS_CSV_URL, timeout=10)
             r.raise_for_status()
             df = pd.read_csv(StringIO(r.text))
+            source = f"GCS {COUPONS_GCS_CSV_URL}"
         except Exception:
             pass
     
     if df is None:
+        logger.warning("No coupon data found from any source")
         return {}
     
     # Parse DataFrame to coupons dict
@@ -131,6 +141,7 @@ def load_coupons(force_refresh: bool = False) -> dict:
     
     _coupon_cache = coupons
     _coupon_cache_time = datetime.now()
+    logger.info("Loaded %d coupons from %s", len(coupons), source)
     return coupons
 
 
