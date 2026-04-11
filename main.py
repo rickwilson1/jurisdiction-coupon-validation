@@ -24,10 +24,8 @@ COUPONS_CSV_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 COUPONS_XLSX_PATH = os.path.join(os.path.dirname(__file__), "coupons.xlsx")
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
 
-# Cloud Storage URLs (fallback source for coupon files)
+# Cloud Storage bucket (fallback source for coupon files, accessed via service account)
 COUPONS_GCS_BUCKET = os.environ.get("COUPONS_BUCKET", "agromin-coupon-data")
-COUPONS_GCS_XLSX_URL = os.environ.get("COUPONS_XLSX_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.xlsx")
-COUPONS_GCS_CSV_URL = os.environ.get("COUPONS_CSV_URL", f"https://storage.googleapis.com/{COUPONS_GCS_BUCKET}/coupons.csv")
 
 # Simple API key for upload endpoint (set this in Cloud Run environment)
 UPLOAD_API_KEY = os.environ.get("UPLOAD_API_KEY", "change-this-secret-key")
@@ -104,22 +102,26 @@ def load_coupons(force_refresh: bool = False) -> dict:
         except Exception:
             pass
     
-    # Fall back to Cloud Storage XLSX
-    if df is None and COUPONS_GCS_XLSX_URL:
+    # Fall back to Cloud Storage (authenticated via service account)
+    if df is None:
         try:
-            r = requests.get(COUPONS_GCS_XLSX_URL, timeout=10)
-            r.raise_for_status()
-            df = pd.read_excel(BytesIO(r.content), engine='openpyxl')
-            source = f"GCS {COUPONS_GCS_XLSX_URL}"
+            client = gcs_storage.Client()
+            bucket = client.bucket(COUPONS_GCS_BUCKET)
+            blob = bucket.blob("coupons.xlsx")
+            if blob.exists():
+                df = pd.read_excel(BytesIO(blob.download_as_bytes()), engine='openpyxl')
+                source = f"GCS gs://{COUPONS_GCS_BUCKET}/coupons.xlsx"
         except Exception:
             pass
     
-    if df is None and COUPONS_GCS_CSV_URL:
+    if df is None:
         try:
-            r = requests.get(COUPONS_GCS_CSV_URL, timeout=10)
-            r.raise_for_status()
-            df = pd.read_csv(StringIO(r.text))
-            source = f"GCS {COUPONS_GCS_CSV_URL}"
+            client = gcs_storage.Client()
+            bucket = client.bucket(COUPONS_GCS_BUCKET)
+            blob = bucket.blob("coupons.csv")
+            if blob.exists():
+                df = pd.read_csv(StringIO(blob.download_as_string().decode("utf-8")))
+                source = f"GCS gs://{COUPONS_GCS_BUCKET}/coupons.csv"
         except Exception:
             pass
     
