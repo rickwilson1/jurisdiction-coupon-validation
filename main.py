@@ -227,8 +227,8 @@ def find_tax_district(lat: float, lon: float, gdf: gpd.GeoDataFrame):
     row = match.iloc[0]
     return {
         "jurisdiction": row.get("JURIS_NAME"),
-        "county": row.get("County_nam"),
-        "city": row.get("City_name") or row.get("City_Name_"),
+        "county": row.get("County_name") or row.get("County_nam"),
+        "city": row.get("City_name") or row.get("City_Name_Proper") or row.get("City_Name_"),
         "rate": row.get("RATE"),
     }
 
