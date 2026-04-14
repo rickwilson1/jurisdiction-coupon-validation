@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 SHAPEFILE_PATH = os.path.join(os.path.dirname(__file__), "CDTFA_TaxDistricts.gpkg")
 COUPONS_CSV_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 COUPONS_XLSX_PATH = os.path.join(os.path.dirname(__file__), "coupons.xlsx")
-GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
+GEOCODE_URL = "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
+ARCGIS_API_KEY = os.environ.get("ARCGIS_API_KEY")
 
 # Cloud Storage bucket (fallback source for coupon files, accessed via service account)
 COUPONS_GCS_BUCKET = os.environ.get("COUPONS_BUCKET", "agromin-coupon-data")
@@ -207,6 +208,8 @@ async def startup_event():
 def geocode_address(address: str):
     """Use ArcGIS geocoder to get lat/lon and matched address."""
     params = {"f": "json", "singleLine": address, "outFields": "Match_addr", "maxLocations": 1}
+    if ARCGIS_API_KEY:
+        params["token"] = ARCGIS_API_KEY
     r = requests.get(GEOCODE_URL, params=params, timeout=15)
     r.raise_for_status()
     data = r.json()
