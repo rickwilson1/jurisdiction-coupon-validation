@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agromin Dispatch — Phase 1: Order Intake</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a18;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 40px;
+  }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b6b62;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #1a1a18;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: #6b6b62;
+    line-height: 1.5;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddddd6;
+  }
+
+  /* ── Actor / system cards ── */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .card {
+    border-radius: 10px;
+    padding: 0;
+    border: 1px solid #e8e8e0;
+    overflow: hidden;
+  }
+
+  /* Colored top bar per card */
+  .card-bar {
+    height: 5px;
+    width: 100%;
+  }
+
+  .card-inner {
+    padding: 16px 20px 20px;
+  }
+
+  /* Per-card color themes */
+  .card-blue   { border-color: #b5d4f4; }
+  .card-blue   .card-bar { background: #378add; }
+  .card-blue   .card-header { border-bottom-color: #ddeefa; }
+  .card-blue   .card-inner { background: #f0f7fe; }
+
+  .card-slate  { border-color: #c4cdd8; }
+  .card-slate  .card-bar { background: #6b7c93; }
+  .card-slate  .card-header { border-bottom-color: #dce2e9; }
+  .card-slate  .card-inner { background: #f3f5f8; }
+
+  .card-teal   { border-color: #7ed4bc; }
+  .card-teal   .card-bar { background: #1d9e75; }
+  .card-teal   .card-header { border-bottom-color: #c8ede4; }
+  .card-teal   .card-inner { background: #f0faf7; }
+
+  .card-indigo { border-color: #a0a9e8; }
+  .card-indigo .card-bar { background: #4a5bbf; }
+  .card-indigo .card-header { border-bottom-color: #d4d8f5; }
+  .card-indigo .card-inner { background: #f2f3fd; }
+
+  .card-green  { border-color: #b0d880; }
+  .card-green  .card-bar { background: #639922; }
+  .card-green  .card-header { border-bottom-color: #d8edbc; }
+  .card-green  .card-inner { background: #f4fae8; }
+
+  .card-amber  { border-color: #fac775; }
+  .card-amber  .card-bar { background: #ba7517; }
+  .card-amber  .card-header { border-bottom-color: #fde8c0; }
+  .card-amber  .card-inner { background: #fffbf0; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0e8;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a18;
+    line-height: 1.2;
+  }
+
+  .card-role {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 1px;
+  }
+
+  .touch-list {
+    list-style: none;
+  }
+
+  .touch-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0;
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .touch-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 1px;
+    background: #c8c8c0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    letter-spacing: 0.04em;
+  }
+
+  .tag-auto   { background: #e8f5ee; color: #1a6b3a; }
+  .tag-manual { background: #fff3e0; color: #8b5000; }
+  .tag-store  { background: #eef0ff; color: #3a40a0; }
+
+  /* color dots */
+  .d-blue   { background: #378add; }
+  .d-teal   { background: #1d9e75; }
+  .d-purple { background: #7f77dd; }
+  .d-amber  { background: #ba7517; }
+  .d-green  { background: #639922; }
+  .d-coral  { background: #d85a30; }
+  .d-slate  { background: #6b7c93; }
+  .d-indigo { background: #4a5bbf; }
+
+  /* ── Order lifecycle flow ── */
+  .flow-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+
+  .flow-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 24px;
+  }
+
+  .flow-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+
+  .flow-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+
+  .flow-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: calc(50% + 22px);
+    right: -1px;
+    width: calc(100% - 44px);
+    height: 1px;
+    background: #ddddd6;
+  }
+
+  .step-pill {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    position: relative;
+    z-index: 1;
+    background: #fff;
+    white-space: nowrap;
+  }
+
+  .step-actor {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+
+  .pill-blue   { color: #185fa5; border-color: #b5d4f4; background: #e6f1fb; }
+  .pill-gray   { color: #5f5e5a; border-color: #d3d1c7; background: #f1efe8; }
+  .pill-green  { color: #3b6d11; border-color: #c0dd97; background: #eaf3de; }
+  .pill-amber  { color: #854f0b; border-color: #fac775; background: #faeeda; }
+  .pill-purple { color: #534ab7; border-color: #cebbf6; background: #eeedfe; }
+  .pill-teal   { color: #0e6e52; border-color: #7ed4bc; background: #e3f7f2; }
+  .pill-indigo { color: #2d3a8c; border-color: #a0a9e8; background: #eceffe; }
+
+  /* ── Vertical connector between flow rows ── */
+  .flow-connector {
+    text-align: center;
+    margin: -8px 0 16px;
+    color: #c8c8c0;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  /* ── Data note inline ── */
+  .flow-note {
+    background: #f5f4f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #6b6b62;
+    margin-bottom: 20px;
+    border-left: 3px solid #ddddd6;
+    line-height: 1.5;
+  }
+
+  /* ── Branch split ── */
+  .split-label {
+    font-size: 12px;
+    color: #9b9b90;
+    margin-bottom: 12px;
+    margin-top: 4px;
+  }
+
+  .flow-branch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .branch-card {
+    border-radius: 8px;
+    padding: 16px 18px;
+    border: 1px solid;
+  }
+
+  .branch-card.pickup {
+    background: #f0faf3;
+    border-color: #b5d9c0;
+  }
+
+  .branch-card.delivery {
+    background: #fffbf0;
+    border-color: #f0d090;
+  }
+
+  .branch-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+
+  .branch-card.pickup .branch-label  { color: #1d6b38; }
+  .branch-card.delivery .branch-label { color: #854f0b; }
+
+  .branch-steps {
+    list-style: none;
+    counter-reset: bstep;
+  }
+
+  .branch-steps li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0 4px 20px;
+    position: relative;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .branch-steps li:last-child { border-bottom: none; }
+
+  .branch-steps li::before {
+    counter-increment: bstep;
+    content: counter(bstep);
+    position: absolute;
+    left: 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: #9b9b90;
+    top: 5px;
+    width: 14px;
+    text-align: right;
+  }
+
+  /* ── Data stores ── */
+  .stores-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+
+  .stores-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .store-card {
+    border-radius: 8px;
+    padding: 14px 16px;
+    border: 1px solid #e0e0d8;
+    background: #fafaf6;
+  }
+
+  .store-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .store-type {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin-bottom: 8px;
+  }
+
+  .store-desc {
+    font-size: 12px;
+    color: #5a5a52;
+    line-height: 1.45;
+  }
+
+  .store-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Automation summary ── */
+  .auto-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .auto-card {
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid;
+  }
+
+  .auto-card.manual {
+    background: #fffbf5;
+    border-color: #fac775;
+  }
+
+  .auto-card.automated {
+    background: #f5fdf7;
+    border-color: #c0dd97;
+  }
+
+  .auto-header {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  .auto-card.manual .auto-header { color: #854f0b; }
+  .auto-card.automated .auto-header { color: #3b6d11; }
+
+  .auto-items {
+    list-style: none;
+  }
+
+  .auto-items li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0 4px 16px;
+    position: relative;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    line-height: 1.4;
+  }
+
+  .auto-items li:last-child { border-bottom: none; }
+
+  .auto-card.manual .auto-items li::before {
+    content: '○';
+    position: absolute;
+    left: 0;
+    font-size: 10px;
+    color: #ba7517;
+    top: 4px;
+  }
+
+  .auto-card.automated .auto-items li::before {
+    content: '●';
+    position: absolute;
+    left: 0;
+    font-size: 10px;
+    color: #3b6d11;
+    top: 4px;
+  }
+
+  footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #b0b0a6;
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #e0e0d8;
+  }
+
+  @media (max-width: 680px) {
+    .cards-grid { grid-template-columns: 1fr 1fr; }
+    .auto-section { grid-template-columns: 1fr; }
+    .flow-branch { grid-template-columns: 1fr; }
+    .stores-grid { grid-template-columns: 1fr 1fr; }
+    h1 { font-size: 22px; }
+  }
+
+  /* ── Phase context banner ── */
+  .phase-banner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .phase-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e8e8e0;
+  }
+
+  .phase-bar { height: 5px; }
+  .phase-card.p1 .phase-bar { background: #6b7c93; }
+  .phase-card.p2 .phase-bar { background: #639922; }
+
+  .phase-inner { padding: 16px 20px; }
+  .phase-card.p1 .phase-inner { background: #f3f5f8; }
+  .phase-card.p2 .phase-inner { background: #f4fae8; }
+
+  .phase-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .phase-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+
+  .phase-card.p1 .phase-badge { background: #dce2e9; color: #4a5a6a; }
+  .phase-card.p2 .phase-badge { background: #d8edbc; color: #3b6d11; }
+
+  .phase-sub { font-size: 12px; color: #6b6b62; margin-bottom: 12px; }
+
+  .phase-list { list-style: none; }
+
+  .phase-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0 4px 16px;
+    position: relative;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .phase-list li:last-child { border-bottom: none; }
+
+  .phase-card.p1 .phase-list li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: #9b9b90;
+  }
+
+  .phase-card.p2 .phase-list li::before {
+    content: '+';
+    position: absolute;
+    left: 0;
+    color: #3b9e50;
+    font-weight: 600;
+  }
+
+  @media print {
+    body { padding: 24px 16px; background: #fff; }
+    .page { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Agromin / OCWR — Order dispatch system · Phase 1 of 2</div>
+    <h1>Phase 1 — Order Intake</h1>
+    <p class="subtitle">Automated order routing, email dispatch, and Firestore logging. Delivery scheduling remains manual and is addressed in Phase 2.</p>
+  </header>
+
+  <!-- ── Phase context banner ── -->
+  <div class="section-label">Scope — what this phase covers</div>
+  <div class="phase-banner">
+
+    <div class="phase-card p1">
+      <div class="phase-bar"></div>
+      <div class="phase-inner">
+        <div class="phase-title">Phase 1 — Order Intake <span class="phase-badge">this document</span></div>
+        <div class="phase-sub">Automated intake and notification. Delivery scheduling is manual.</div>
+        <ul class="phase-list">
+          <li>Inbox watch detects program orders automatically</li>
+          <li>Routes each order: delivery vs. pickup, qty threshold</li>
+          <li>Sends correct email to customer automatically</li>
+          <li>Alerts Greg on every delivery order</li>
+          <li>Logs all orders to Firestore</li>
+          <li>Greg schedules deliveries manually — phone call, no tool</li>
+          <li>No visibility into pending vs. scheduled deliveries</li>
+          <li>Greenery Log remains a shared Excel spreadsheet</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card p2">
+      <div class="phase-bar"></div>
+      <div class="phase-inner">
+        <div class="phase-title">Phase 2 — Delivery Scheduling <span class="phase-badge">next</span></div>
+        <div class="phase-sub">Adds scheduling tools, delivery visibility, and yard log.</div>
+        <ul class="phase-list">
+          <li>Greg's delivery queue — all pending orders in one place</li>
+          <li>Greg logs confirmed date/time after calling customer</li>
+          <li>Customer gets "delivery scheduled" email automatically</li>
+          <li>Ofelia's live schedule view — no more asking Greg</li>
+          <li>Yard staff log fulfillments via browser form</li>
+          <li>Greenery Log replaces shared Excel</li>
+          <li>OCWR-formatted export for compliance reporting</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── System components ── -->
+  <div class="section-label">Systems and people involved</div>
+  <div class="cards-grid">
+
+    <div class="card card-blue">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-blue"></div>
+        <div>
+          <div class="card-name">Customer</div>
+          <div class="card-role">Orange County resident</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Places order at shop.agromin.com</li>
+        <li>Enters coupon code + address</li>
+        <li>Coupon validated at checkout</li>
+        <li>Receives confirmation email</li>
+        <li>Brings ID to yard or awaits delivery call</li>
+      </ul>
+      </div>
+    </div>
+
+    <div class="card card-slate">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-slate"></div>
+        <div>
+          <div class="card-name">CIMcloud + Sage 100</div>
+          <div class="card-role">Order &amp; accounting system</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Accepts or declines order at checkout</li>
+        <li>Sends confirmation email to sales@agromin.com</li>
+        <li>Syncs orders into Sage 100</li>
+        <li>No API access available to Agromin</li>
+        <li>Email inbox is the only readable output</li>
+      </ul>
+      </div>
+    </div>
+
+    <div class="card card-teal">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-teal"></div>
+        <div>
+          <div class="card-name">Coupon Validator</div>
+          <div class="card-role">Cloud Run · existing service</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Called at checkout — before order is placed</li>
+        <li>Geocodes customer address via ArcGIS</li>
+        <li>Checks coupon vs. CDTFA tax district</li>
+        <li>Returns accepted or denied to CIMcloud</li>
+        <li>Validation complete before dispatch sees order</li>
+      </ul>
+      </div>
+    </div>
+
+    <div class="card card-indigo">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-indigo"></div>
+        <div>
+          <div class="card-name">Power Automate</div>
+          <div class="card-role">Inbox watch + order parser</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Watches sales@agromin.com inbox</li>
+        <li>Triggers on emails with "Coupon Code:" field</li>
+        <li>Parses order fields from email HTML</li>
+        <li>POSTs structured JSON to dispatch service</li>
+        <li>Ignores all paid orders automatically</li>
+      </ul>
+      </div>
+    </div>
+
+    <div class="card card-green">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-green"></div>
+        <div>
+          <div class="card-name">Dispatch Service</div>
+          <div class="card-role">Cloud Run · new service</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Receives parsed order from Power Automate</li>
+        <li>Routes: delivery vs. pickup, qty threshold</li>
+        <li>Sends correct email to customer <span class="tag tag-auto">auto</span></li>
+        <li>Alerts Greg on delivery orders <span class="tag tag-auto">auto</span></li>
+        <li>Logs order to Firestore <span class="tag tag-store">store</span></li>
+      </ul>
+      </div>
+    </div>
+
+    <div class="card card-amber">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+      <div class="card-header">
+        <div class="dot d-amber"></div>
+        <div>
+          <div class="card-name">Greg (Brian)</div>
+          <div class="card-role">Delivery coordinator</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Receives alert email per delivery order <span class="tag tag-auto">auto</span></li>
+        <li>Calls customer to agree on date/time <span class="tag tag-manual">manual</span></li>
+        <li>Assigns truck and coordinates haul <span class="tag tag-manual">manual</span></li>
+        <li>Requests PDF manifest for hauler</li>
+        <li>Ofelia CC'd on all customer emails <span class="tag tag-auto">auto</span></li>
+      </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Order lifecycle ── -->
+  <div class="flow-section">
+    <div class="flow-title">Order lifecycle — sequence from checkout to fulfillment</div>
+
+    <!-- Row 1: checkout to inbox -->
+    <div class="flow-track">
+      <div class="flow-step">
+        <span class="step-pill pill-blue">1 — Checkout</span>
+        <div class="step-actor">Customer enters<br>coupon + address</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-teal">2 — Validated</span>
+        <div class="step-actor">Coupon Validator<br>accepts or denies</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-gray">3 — Order placed</span>
+        <div class="step-actor">CIMcloud sends<br>email to sales inbox</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-indigo">4 — Detected</span>
+        <div class="step-actor">Power Automate<br>parses + POSTs</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-green">5 — Routed</span>
+        <div class="step-actor">Dispatch service<br>routes + logs</div>
+      </div>
+    </div>
+
+    <div class="flow-note">
+      By step 5, the coupon and address have already been validated. The dispatch service reads the shipping method only — no re-validation needed. The Firestore log written here is the only structured, queryable record of the order outside of CIMcloud and Sage 100, neither of which have an available API.
+    </div>
+
+    <!-- Step 6 branch -->
+    <div class="split-label">Step 6 — Fulfillment splits by order type</div>
+    <div class="flow-branch">
+
+      <div class="branch-card pickup">
+        <div class="branch-label">Pickup path</div>
+        <ol class="branch-steps">
+          <li>Customer receives email with yard address + hours <span class="tag tag-auto">auto</span></li>
+          <li>Under 5 cu yds — self-load with 5-gallon buckets</li>
+          <li>5 cu yds or more — OCWR staff loads with equipment; truck/trailer required</li>
+          <li>Customer shows email confirmation + photo ID at yard</li>
+          <li>OCWR staff enters fulfillment in Greenery Log</li>
+        </ol>
+      </div>
+
+      <div class="branch-card delivery">
+        <div class="branch-label">Delivery path</div>
+        <ol class="branch-steps">
+          <li>Customer receives delivery acknowledgment email <span class="tag tag-auto">auto</span></li>
+          <li>Greg receives alert email with customer details <span class="tag tag-auto">auto</span></li>
+          <li>Greg calls customer to agree on delivery date/time <span class="tag tag-manual">manual</span></li>
+          <li>Greg assigns truck and coordinates haul <span class="tag tag-manual">manual</span></li>
+          <li>Hauler carries PDF manifest; OCWR signs at pickup</li>
+        </ol>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Data stores ── -->
+  <div class="section-label">Where data lives</div>
+  <div class="stores-section">
+    <div class="stores-grid">
+
+      <div class="store-card">
+        <div class="store-name"><div class="store-dot d-slate"></div>CIMcloud / Sage 100</div>
+        <div class="store-type">Order &amp; accounting system</div>
+        <div class="store-desc">Source of record for all orders. No API access. Readable only via confirmation emails sent to sales@agromin.com.</div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-name"><div class="store-dot d-green"></div>Firestore — order_events</div>
+        <div class="store-type">Google Cloud · NoSQL</div>
+        <div class="store-desc">Written by the dispatch service for every program order. The only place you can query dispatch history — routing decisions, customer details, qty — without reading emails.</div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-name"><div class="store-dot d-teal"></div>GCS — agromin-coupon-data</div>
+        <div class="store-type">Google Cloud Storage</div>
+        <div class="store-desc">Stores the active coupons.xlsx file. Used by the Coupon Validator at checkout. Updated by admin upload; refreshes within 5 minutes.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Automation summary ── -->
+  <div class="section-label">What is automated vs. manual</div>
+  <div class="auto-section">
+
+    <div class="auto-card automated">
+      <div class="auto-header">Automated in Phase 1</div>
+      <ul class="auto-items">
+        <li>Inbox watch — no manual email scanning needed</li>
+        <li>Routing decision (delivery vs. pickup, qty threshold)</li>
+        <li>Customer confirmation email with correct instructions</li>
+        <li>Yard name, address, and hours populated from order</li>
+        <li>Ofelia CC'd on all order emails</li>
+        <li>Greg alert email on every delivery order</li>
+        <li>Firestore log written per order</li>
+        <li>PDF manifest generated on request</li>
+      </ul>
+    </div>
+
+    <div class="auto-card manual">
+      <div class="auto-header">Remains manual — addressed in Phase 2</div>
+      <ul class="auto-items">
+        <li>Greg calls customer to negotiate delivery slot</li>
+        <li>Truck assignment and haul logistics</li>
+        <li>Recording confirmed delivery date/time</li>
+        <li>ID and address verification at yard gate</li>
+        <li>Material loading (self or OCWR staff)</li>
+        <li>Greenery Log entry by OCWR staff</li>
+        <li>Hauler manifest physical signature</li>
+        <li>Exception handling and coupon support</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <footer>
+    Agromin · OCWR Free Compost &amp; Mulch Program · Dispatch Phase 1: Order Intake · April 2026
+  </footer>
+
+</div>
+</body>
+</html>

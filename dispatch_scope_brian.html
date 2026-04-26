@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agromin Order Dispatch — How It Works for Deliveries</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#0a0c12;color:#e0ddd6;min-height:100vh;padding:40px 24px}
+.page{max-width:860px;margin:0 auto}
+
+header{margin-bottom:44px}
+.eyebrow{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#4a9e6b;margin-bottom:8px}
+h1{font-size:28px;font-weight:600;letter-spacing:-.025em;color:#f0ede6;margin-bottom:6px}
+.subtitle{font-size:13px;color:#5a5a54}
+
+/* Section headers */
+.section{margin-bottom:36px}
+.section-label{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#5a5a54;margin-bottom:14px}
+h2{font-size:17px;font-weight:600;color:#f0ede6;margin-bottom:12px;letter-spacing:-.015em}
+
+/* Flow steps */
+.flow{display:flex;flex-direction:column;gap:0;margin-bottom:8px}
+.step{display:flex;gap:16px;align-items:flex-start;padding:16px 20px;background:#13161f;border:1px solid #1e2130;position:relative}
+.step:first-child{border-radius:10px 10px 0 0}
+.step:last-child{border-radius:0 0 10px 10px}
+.step:not(:last-child){border-bottom:none}
+.step-num{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#4a9e6b;background:#0d1a14;border:1px solid #1e3d28;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-body{flex:1}
+.step-title{font-size:14px;font-weight:600;color:#f0ede6;margin-bottom:4px}
+.step-desc{font-size:13px;color:#8a8780;line-height:1.5}
+.step-tag{display:inline-block;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;padding:2px 8px;border-radius:4px;margin-top:6px;letter-spacing:.05em}
+.tag-auto{background:#0d1a14;color:#4a9e6b;border:1px solid #1e3d28}
+.tag-manual{background:#1a1208;color:#c8922a;border:1px solid #3d2e10}
+.tag-scope{background:#0e1320;color:#5a8fd4;border:1px solid #1e3050}
+
+/* Two-column cards */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+.card{background:#13161f;border:1px solid #1e2130;border-radius:10px;padding:20px}
+.card-title{font-size:13px;font-weight:600;color:#f0ede6;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card-icon{font-size:16px}
+.card ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.card ul li{font-size:13px;color:#8a8780;line-height:1.45;padding-left:14px;position:relative}
+.card ul li::before{content:"·";position:absolute;left:0;color:#4a9e6b}
+
+/* Highlight box */
+.highlight{background:#0e1320;border:1px solid #1e3050;border-radius:10px;padding:20px 24px;margin-bottom:8px}
+.highlight-label{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5a8fd4;margin-bottom:10px}
+.highlight p{font-size:14px;color:#c0bdb6;line-height:1.6}
+.highlight strong{color:#f0ede6;font-weight:600}
+
+/* Warning box */
+.note{background:#120f08;border:1px solid #3d2e10;border-radius:10px;padding:20px 24px;margin-bottom:8px}
+.note-label{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#c8922a;margin-bottom:10px}
+.note p{font-size:14px;color:#c0bdb6;line-height:1.6}
+.note strong{color:#f0ede6;font-weight:600}
+
+/* Email preview */
+.email-preview{background:#0d0f16;border:1px solid #1e2130;border-radius:10px;overflow:hidden;margin-bottom:8px}
+.email-header{background:#13161f;border-bottom:1px solid #1e2130;padding:12px 20px;display:flex;flex-direction:column;gap:4px}
+.email-field{font-size:12px;color:#5a5a54;font-family:'DM Mono',monospace}
+.email-field span{color:#8a8780}
+.email-body{padding:20px;font-size:13px;color:#8a8780;line-height:1.7;white-space:pre-wrap;font-family:'DM Sans',sans-serif}
+.email-body strong{color:#c0bdb6;font-weight:600}
+
+/* Divider */
+.divider{border:none;border-top:1px solid #1a1d28;margin:40px 0}
+
+/* Scope table */
+.scope-table{width:100%;border-collapse:collapse;font-size:13px}
+.scope-table th{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5a5a54;text-align:left;padding:10px 16px;border-bottom:1px solid #1e2130}
+.scope-table td{padding:12px 16px;border-bottom:1px solid #13161f;color:#8a8780;vertical-align:top}
+.scope-table tr:last-child td{border-bottom:none}
+.scope-table td:first-child{color:#c0bdb6;font-weight:500;white-space:nowrap}
+.scope-table-wrap{background:#13161f;border:1px solid #1e2130;border-radius:10px;overflow:hidden;margin-bottom:8px}
+
+.pill{display:inline-block;font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;letter-spacing:.05em}
+.pill-auto{background:#0d1a14;color:#4a9e6b;border:1px solid #1e3d28}
+.pill-manual{background:#1a1208;color:#c8922a;border:1px solid #3d2e10}
+.pill-out{background:#161216;color:#7a5a8a;border:1px solid #2d1e3d}
+
+footer{margin-top:48px;padding-top:20px;border-top:1px solid #1a1d28;font-size:12px;color:#3a3a34;font-family:'DM Mono',monospace;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Agromin · OCWR Program · Order Dispatch v1</div>
+    <h1>How Delivery Orders Are Handled</h1>
+    <div class="subtitle">For review by Brian and the operations team — April 2026</div>
+  </header>
+
+  <!-- Overview -->
+  <div class="section">
+    <div class="section-label">Overview</div>
+    <div class="highlight">
+      <div class="highlight-label">What this system does</div>
+      <p>When a customer places a free compost or mulch order on <strong>shop.agromin.com</strong> using a program coupon code, the order dispatch system automatically identifies it, routes it, and sends the customer the right instructions — with no manual intervention required for the intake step.</p>
+      <p style="margin-top:10px">For delivery orders specifically: the system handles intake and notification. <strong>Brian continues to own scheduling</strong> — contacting the customer, agreeing on a date/time, and coordinating the haul. That step is intentionally left manual in version 1.</p>
+    </div>
+  </div>
+
+  <!-- Step by step flow -->
+  <div class="section">
+    <div class="section-label">What happens when a delivery order comes in</div>
+    <div class="flow">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Customer places order on shop.agromin.com</div>
+          <div class="step-desc">Uses a jurisdiction coupon code (e.g. COUOCCOM26). Selects a delivery shipping method. CIMcloud sends a confirmation email to sales@agromin.com.</div>
+          <span class="step-tag tag-auto">Automated — no change from today</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Power Automate detects the order email</div>
+          <div class="step-desc">Watches the sales inbox. Detects emails with subject "Pending Approval for Order Number…" that contain a coupon code. Parses the order details and sends them to the dispatch service.</div>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Dispatch service routes the order</div>
+          <div class="step-desc">Confirms the coupon is a valid active program code. Detects "Delivery" in the shipping method. Logs the order to the Firestore database as a pending delivery.</div>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Customer receives an acknowledgment email</div>
+          <div class="step-desc">Sent automatically from sales@agromin.com. Sets the expectation that an Agromin representative will contact them within 1 business day to schedule. Does not promise a date or time.</div>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Brian receives a delivery alert email</div>
+          <div class="step-desc">Sent simultaneously to greg@agromin.com. Contains the customer name, delivery address, phone number, material, and quantity. This is Brian's signal to contact the customer and coordinate a delivery slot.</div>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Brian contacts the customer and schedules the delivery</div>
+          <div class="step-desc">Brian calls or emails the customer to agree on a date and time window, accounting for truck availability and customer schedule. This negotiation is not automated — it requires human judgment.</div>
+          <span class="step-tag tag-manual">Manual — Brian owns this step</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+          <div class="step-title">Hauler carries a PDF manifest on delivery day</div>
+          <div class="step-desc">The system can generate a PDF delivery manifest on demand — includes customer name, delivery address, material, quantity, coupon code, and a signature line for OCWR staff. Brian or Ofelia can request this for any delivery order.</div>
+          <span class="step-tag tag-auto">Automated — on demand</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- What Brian receives -->
+  <div class="section">
+    <div class="section-label">What Brian's alert email looks like</div>
+    <div class="email-preview">
+      <div class="email-header">
+        <div class="email-field">From: <span>sales@agromin.com</span></div>
+        <div class="email-field">To: <span>greg@agromin.com</span></div>
+        <div class="email-field">Subject: <span>Delivery Order #108870 — Scheduling Required</span></div>
+      </div>
+      <div class="email-body"><strong>New delivery order received — scheduling required.</strong>
+
+Order #:          108870
+Customer:         Julian Vanderlinden
+Phone:            805-555-0192
+Delivery address: 417 Skyhigh Drive, Ventura, CA 93001
+
+Material:         Cover Mulch
+Quantity:         20 cubic yards
+Coupon:           COUVCM26 (County of Ventura)
+
+Shipping method:  $230 Delivery - Minimum 3 Cubic Yards
+
+The customer has been notified to expect contact within 1 business day.
+Please reach out to schedule a delivery window.</div>
+    </div>
+  </div>
+
+  <!-- Customer email -->
+  <div class="section">
+    <div class="section-label">What the customer receives (automatically)</div>
+    <div class="email-preview">
+      <div class="email-header">
+        <div class="email-field">From: <span>sales@agromin.com</span></div>
+        <div class="email-field">To: <span>customer@example.com</span></div>
+        <div class="email-field">Cc: <span>ofelia@agromin.com</span></div>
+        <div class="email-field">Subject: <span>Your Agromin Order #108870 — Delivery Confirmation</span></div>
+      </div>
+      <div class="email-body">Hello Julian,
+
+Thank you for your order. An Agromin representative will contact you within
+1 business day to schedule your delivery.
+
+Order #:          108870
+Material:         20 cubic yards of Cover Mulch
+Delivery Address: 417 Skyhigh Drive, Ventura, CA 93001
+
+Please note: delivery fees apply separately and will be collected at time of delivery.
+
+Questions? Email sales@agromin.com or call (805) 485-9200.
+
+Thank you,
+Agromin</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Scope table -->
+  <div class="section">
+    <div class="section-label">What is and isn't automated in version 1</div>
+    <div class="scope-table-wrap">
+      <table class="scope-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Who / What</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Detect program orders in the inbox</td>
+            <td>Power Automate</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Identify delivery vs. pickup orders</td>
+            <td>Dispatch service</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Send customer acknowledgment email</td>
+            <td>Dispatch service → M365 SMTP</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Alert Brian of new delivery order</td>
+            <td>Dispatch service → M365 SMTP</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Log order to database</td>
+            <td>Dispatch service → Firestore</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Generate hauler PDF manifest</td>
+            <td>Dispatch service — on demand</td>
+            <td><span class="pill pill-auto">Automated</span></td>
+          </tr>
+          <tr>
+            <td>Contact customer to negotiate delivery slot</td>
+            <td>Brian</td>
+            <td><span class="pill pill-manual">Manual</span></td>
+          </tr>
+          <tr>
+            <td>Assign truck / coordinate haul logistics</td>
+            <td>Brian</td>
+            <td><span class="pill pill-manual">Manual</span></td>
+          </tr>
+          <tr>
+            <td>Record confirmed delivery date/time</td>
+            <td>Brian (existing tools)</td>
+            <td><span class="pill pill-manual">Manual</span></td>
+          </tr>
+          <tr>
+            <td>Automated delivery calendar / scheduling tool</td>
+            <td>—</td>
+            <td><span class="pill pill-out">Out of scope v1</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Note about future -->
+  <div class="section">
+    <div class="note">
+      <div class="note-label">Note on future versions</div>
+      <p>Version 1 is intentionally scoped to handle intake and notification only. Once the team has used it for a season, it will be clear whether adding a scheduling step — for example, a simple web form where Brian records a confirmed delivery date, or a view for Ofelia showing pending vs. scheduled deliveries — is worth building. That decision doesn't need to be made now.</p>
+    </div>
+  </div>
+
+  <!-- Two column: what changes, what stays the same -->
+  <div class="section">
+    <div class="section-label">Summary — what changes for Brian</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title"><span class="card-icon">✓</span> What changes</div>
+        <ul>
+          <li>Brian receives a structured alert email for every new delivery order — no more scanning the sales inbox manually</li>
+          <li>Customer has already been notified before Brian calls — no need to send a separate acknowledgment</li>
+          <li>Order details (address, material, qty, phone) arrive pre-parsed and ready to act on</li>
+          <li>PDF manifest available on request for the hauler</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">→</span> What stays the same</div>
+        <ul>
+          <li>Brian still contacts the customer directly to agree on a date and time</li>
+          <li>Brian still manages truck assignment and haul logistics</li>
+          <li>No new software for Brian to log into or learn</li>
+          <li>Scheduling happens the same way it does today</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>agromin · coupon-dispatch · v1 scope</span>
+    <span>April 2026</span>
+  </footer>
+
+</div>
+</body>
+</html>

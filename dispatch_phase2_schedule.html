@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agromin Dispatch — Phase 2: Delivery Scheduling</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a18;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .page { max-width: 900px; margin: 0 auto; }
+
+  header { margin-bottom: 40px; }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b6b62;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #1a1a18;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: #6b6b62;
+    line-height: 1.5;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddddd6;
+  }
+
+  /* ── Phase comparison banner ── */
+  .phase-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .phase-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e8e8e0;
+  }
+
+  .phase-bar {
+    height: 5px;
+  }
+
+  .phase-card.p1 .phase-bar { background: #6b7c93; }
+  .phase-card.p2 .phase-bar { background: #639922; }
+
+  .phase-inner {
+    padding: 18px 20px;
+  }
+
+  .phase-card.p1 .phase-inner { background: #f3f5f8; }
+  .phase-card.p2 .phase-inner { background: #f4fae8; }
+
+  .phase-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .phase-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+
+  .phase-card.p1 .phase-badge { background: #dce2e9; color: #4a5a6a; }
+  .phase-card.p2 .phase-badge { background: #d8edbc; color: #3b6d11; }
+
+  .phase-sub {
+    font-size: 12px;
+    color: #6b6b62;
+    margin-bottom: 14px;
+  }
+
+  .phase-list {
+    list-style: none;
+  }
+
+  .phase-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0 4px 16px;
+    position: relative;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .phase-list li:last-child { border-bottom: none; }
+
+  .phase-card.p1 .phase-list li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: #9b9b90;
+    font-size: 11px;
+  }
+
+  .phase-card.p2 .phase-list li::before {
+    content: '+';
+    position: absolute;
+    left: 0;
+    color: #3b9e50;
+    font-size: 12px;
+    font-weight: 600;
+    top: 3px;
+  }
+
+  /* ── New components ── */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e8e8e0;
+  }
+
+  .card-bar { height: 5px; width: 100%; }
+
+  .card-inner { padding: 16px 20px 20px; }
+
+  .card-green  { border-color: #b0d880; }
+  .card-green  .card-bar { background: #639922; }
+  .card-green  .card-header { border-bottom-color: #d8edbc; }
+  .card-green  .card-inner { background: #f4fae8; }
+
+  .card-amber  { border-color: #fac775; }
+  .card-amber  .card-bar { background: #ba7517; }
+  .card-amber  .card-header { border-bottom-color: #fde8c0; }
+  .card-amber  .card-inner { background: #fffbf0; }
+
+  .card-purple { border-color: #cebbf6; }
+  .card-purple .card-bar { background: #7f77dd; }
+  .card-purple .card-header { border-bottom-color: #e8e0fc; }
+  .card-purple .card-inner { background: #f5f3fe; }
+
+  .card-teal   { border-color: #7ed4bc; }
+  .card-teal   .card-bar { background: #1d9e75; }
+  .card-teal   .card-header { border-bottom-color: #c8ede4; }
+  .card-teal   .card-inner { background: #f0faf7; }
+
+  .card-coral  { border-color: #f0b09a; }
+  .card-coral  .card-bar { background: #d85a30; }
+  .card-coral  .card-header { border-bottom-color: #fad8cc; }
+  .card-coral  .card-inner { background: #fdf4f1; }
+
+  .card-blue   { border-color: #b5d4f4; }
+  .card-blue   .card-bar { background: #378add; }
+  .card-blue   .card-header { border-bottom-color: #ddeefa; }
+  .card-blue   .card-inner { background: #f0f7fe; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0e8;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .d-green  { background: #639922; }
+  .d-amber  { background: #ba7517; }
+  .d-purple { background: #7f77dd; }
+  .d-teal   { background: #1d9e75; }
+  .d-coral  { background: #d85a30; }
+  .d-blue   { background: #378add; }
+
+  .card-name { font-size: 14px; font-weight: 600; color: #1a1a18; line-height: 1.2; }
+  .card-role { font-size: 11px; color: #9b9b90; margin-top: 1px; }
+
+  .touch-list { list-style: none; }
+
+  .touch-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0 4px 14px;
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .touch-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 1px;
+    background: #c8c8c0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    letter-spacing: 0.04em;
+  }
+
+  .tag-auto   { background: #e8f5ee; color: #1a6b3a; }
+  .tag-new    { background: #e8f5ee; color: #1a6b3a; }
+  .tag-manual { background: #fff3e0; color: #8b5000; }
+  .tag-p1     { background: #f3f5f8; color: #4a5a6a; }
+  .tag-store  { background: #eef0ff; color: #3a40a0; }
+
+  /* ── Flow section ── */
+  .flow-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+
+  .flow-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 6px;
+  }
+
+  .flow-sub {
+    font-size: 12px;
+    color: #9b9b90;
+    margin-bottom: 24px;
+  }
+
+  .flow-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 8px;
+  }
+
+  .flow-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+
+  .flow-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: calc(50% + 22px);
+    width: calc(100% - 44px);
+    height: 1px;
+    background: #ddddd6;
+  }
+
+  .step-pill {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    position: relative;
+    z-index: 1;
+    background: #fff;
+    white-space: nowrap;
+  }
+
+  .step-actor {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+
+  .step-new {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    color: #3b9e50;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 3px;
+  }
+
+  .pill-gray   { color: #5f5e5a; border-color: #d3d1c7; background: #f1efe8; }
+  .pill-green  { color: #3b6d11; border-color: #c0dd97; background: #eaf3de; }
+  .pill-amber  { color: #854f0b; border-color: #fac775; background: #faeeda; }
+  .pill-teal   { color: #0e6e52; border-color: #7ed4bc; background: #e3f7f2; }
+  .pill-purple { color: #534ab7; border-color: #cebbf6; background: #eeedfe; }
+  .pill-blue   { color: #185fa5; border-color: #b5d4f4; background: #e6f1fb; }
+  .pill-coral  { color: #8b2a0e; border-color: #f0b09a; background: #fdf0eb; }
+
+  .flow-note {
+    background: #f5f4f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #6b6b62;
+    margin: 16px 0;
+    border-left: 3px solid #ddddd6;
+    line-height: 1.5;
+  }
+
+  /* ── Screen mockups ── */
+  .screens-section {
+    margin-bottom: 40px;
+  }
+
+  .screens-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .screen {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    overflow: hidden;
+  }
+
+  .screen-bar {
+    background: #1a1a18;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .screen-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3a3a38;
+  }
+
+  .screen-url {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #6b6b62;
+    margin-left: 4px;
+  }
+
+  .screen-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1a1a18;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #f0f0e8;
+  }
+
+  .screen-body {
+    padding: 14px 16px;
+  }
+
+  /* Brian's queue */
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 1px solid #e8e8e0;
+    background: #fafaf6;
+  }
+
+  .queue-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .qs-pending  { background: #fac775; }
+  .qs-called   { background: #378add; }
+  .qs-sched    { background: #639922; }
+
+  .queue-info { flex: 1; }
+  .queue-name { font-size: 12px; font-weight: 600; color: #1a1a18; }
+  .queue-meta { font-size: 11px; color: #9b9b90; }
+
+  .queue-action {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    cursor: pointer;
+  }
+
+  .qa-schedule { color: #3b6d11; border-color: #c0dd97; background: #eaf3de; }
+  .qa-view     { color: #5f5e5a; border-color: #d3d1c7; background: #f1efe8; }
+
+  .screen-legend {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px;
+    border-top: 1px solid #f0f0e8;
+    background: #fafaf6;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: #6b6b62;
+  }
+
+  /* Schedule form */
+  .form-row {
+    margin-bottom: 10px;
+  }
+
+  .form-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9b9b90;
+    margin-bottom: 3px;
+  }
+
+  .form-value {
+    font-size: 12px;
+    color: #1a1a18;
+    background: #f5f4f0;
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid #e0e0d8;
+  }
+
+  .form-input {
+    font-size: 12px;
+    color: #9b9b90;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid #d0d0c8;
+    font-style: italic;
+  }
+
+  .form-btn {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: 6px;
+    background: #639922;
+    color: #fff;
+    border: none;
+  }
+
+  /* Ofelia view */
+  .sched-week {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #9b9b90;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .sched-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: #f0faf7;
+    border: 1px solid #c8ede4;
+    align-items: flex-start;
+  }
+
+  .sched-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #1d9e75;
+    white-space: nowrap;
+    padding-top: 2px;
+    min-width: 52px;
+  }
+
+  .sched-info { flex: 1; }
+  .sched-name { font-size: 12px; font-weight: 600; color: #1a1a18; }
+  .sched-meta { font-size: 11px; color: #6b6b62; }
+
+  .sched-item.pending {
+    background: #fffbf0;
+    border-color: #fde8c0;
+  }
+
+  .sched-item.pending .sched-date { color: #ba7517; }
+
+  /* ── Greenery log ── */
+  .yard-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+
+  .yard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 4px;
+  }
+
+  .yard-col-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 10px;
+  }
+
+  .yard-list { list-style: none; }
+
+  .yard-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 5px 0 5px 16px;
+    position: relative;
+    line-height: 1.4;
+    border-bottom: 1px solid #f0f0e8;
+  }
+
+  .yard-list li:last-child { border-bottom: none; }
+
+  .yard-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 5px;
+    height: 1px;
+    background: #c8c8c0;
+  }
+
+  /* ── Build order ── */
+  .build-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+
+  .build-steps { list-style: none; counter-reset: bstep; }
+
+  .build-steps li {
+    counter-increment: bstep;
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0e8;
+    align-items: flex-start;
+  }
+
+  .build-steps li:last-child { border-bottom: none; }
+
+  .build-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+    background: #639922;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .build-body { flex: 1; }
+
+  .build-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 3px;
+  }
+
+  .build-desc {
+    font-size: 12px;
+    color: #6b6b62;
+    line-height: 1.5;
+  }
+
+  .build-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    vertical-align: middle;
+  }
+
+  .bt-easy   { background: #e8f5ee; color: #1a6b3a; }
+  .bt-medium { background: #fff3e0; color: #8b5000; }
+  .bt-prereq { background: #eef0ff; color: #3a40a0; }
+
+  footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #b0b0a6;
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #e0e0d8;
+  }
+
+  @media (max-width: 680px) {
+    .phase-compare, .cards-grid, .screens-grid, .yard-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+  }
+
+  @media print {
+    body { padding: 24px 16px; background: #fff; }
+    .page { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Agromin / OCWR — Order dispatch system · Phase 2 of 2</div>
+    <h1>Phase 2 — Delivery Scheduling</h1>
+    <p class="subtitle">Adds Greg's delivery queue, Ofelia's schedule view, and a yard fulfillment log on top of Phase 1 Order Intake.</p>
+  </header>
+
+  <!-- ── Phase comparison ── -->
+  <div class="section-label">Scope — what this phase adds to Phase 1</div>
+  <div class="phase-compare">
+
+    <div class="phase-card p1">
+      <div class="phase-bar"></div>
+      <div class="phase-inner">
+        <div class="phase-title">Phase 1 — Order Intake <span class="phase-badge">live</span></div>
+        <div class="phase-sub">Automated intake and notification. Delivery scheduling is manual.</div>
+        <ul class="phase-list">
+          <li>Order detected and routed automatically</li>
+          <li>Customer gets correct email instructions</li>
+          <li>Greg gets an alert email per delivery order</li>
+          <li>Order written to Firestore</li>
+          <li>Greg schedules manually — phone call, no tool</li>
+          <li>No visibility into pending vs. scheduled deliveries</li>
+          <li>Ofelia asks Greg for updates</li>
+          <li>Greenery Log is a shared Excel file</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card p2">
+      <div class="phase-bar"></div>
+      <div class="phase-inner">
+        <div class="phase-title">Phase 2 — Delivery Scheduling <span class="phase-badge">this document</span></div>
+        <div class="phase-sub">Adds scheduling tools, delivery visibility, and yard log.</div>
+        <ul class="phase-list">
+          <li>Greg has a queue view — all pending deliveries in one place</li>
+          <li>Greg logs a confirmed date/time after calling customer</li>
+          <li>Firestore record updated with scheduled slot</li>
+          <li>Customer gets a "your delivery is scheduled" email automatically</li>
+          <li>Ofelia has a live schedule view — no more asking Greg</li>
+          <li>Yard staff log fulfillments via a simple browser form</li>
+          <li>Greenery log exportable as CSV/Excel for OCWR reporting</li>
+          <li>All data stays in Firestore — no new platform</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── New components ── -->
+  <div class="section-label">What gets built — new components</div>
+  <div class="cards-grid">
+
+    <div class="card card-amber">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-amber"></div>
+          <div>
+            <div class="card-name">Brian's Delivery Queue</div>
+            <div class="card-role">Web app · Greg's daily tool</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li>Lists all pending delivery orders <span class="tag tag-new">new</span></li>
+          <li>Status: pending call → called → scheduled</li>
+          <li>One-click to open the schedule form</li>
+          <li>Enter confirmed date, time window, notes</li>
+          <li>Triggers customer confirmation email on save <span class="tag tag-new">new</span></li>
+          <li>Simple URL — no login needed if X-API-Key in URL</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-purple">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-purple"></div>
+          <div>
+            <div class="card-name">Ofelia's Schedule View</div>
+            <div class="card-role">Web app · read-only dashboard</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li>Shows this week and next week's deliveries <span class="tag tag-new">new</span></li>
+          <li>Pending (unscheduled) shown separately</li>
+          <li>Customer name, address, material, qty, date</li>
+          <li>Read-only — no edit access</li>
+          <li>Replaces the Friday email summary</li>
+          <li>Always live — reflects Greg's latest updates</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-teal">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-teal"></div>
+          <div>
+            <div class="card-name">Yard Fulfillment Log</div>
+            <div class="card-role">Web app · yard gate tablet</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li>Staff enter order number → fields auto-fill <span class="tag tag-new">new</span></li>
+          <li>Confirm material type and qty loaded</li>
+          <li>Staff name / initials</li>
+          <li>Timestamp recorded automatically</li>
+          <li>Replaces shared Excel Greenery Log</li>
+          <li>Export to CSV/Excel for OCWR reporting <span class="tag tag-new">new</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-green">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-green"></div>
+          <div>
+            <div class="card-name">New API Endpoints</div>
+            <div class="card-role">Dispatch Service additions</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li><code style="font-size:11px">POST /api/schedule-delivery</code> <span class="tag tag-new">new</span></li>
+          <li>Writes confirmed slot to Firestore order record</li>
+          <li>Triggers "delivery scheduled" email to customer</li>
+          <li><code style="font-size:11px">GET /api/delivery-queue</code> — pending deliveries</li>
+          <li><code style="font-size:11px">POST /api/log-fulfillment</code> — yard log entry</li>
+          <li><code style="font-size:11px">GET /api/fulfillment-report</code> — CSV export</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-blue">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-blue"></div>
+          <div>
+            <div class="card-name">Customer — Scheduled Email</div>
+            <div class="card-role">New automated email template</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li>Sent when Greg confirms date/time <span class="tag tag-new">new</span></li>
+          <li>"Your delivery is scheduled for [date]"</li>
+          <li>Includes time window and contact number</li>
+          <li>Replaces Brian having to email/call again</li>
+          <li>Ofelia CC'd as with all customer emails</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-coral">
+      <div class="card-bar"></div>
+      <div class="card-inner">
+        <div class="card-header">
+          <div class="dot d-coral"></div>
+          <div>
+            <div class="card-name">Firestore — Extended Schema</div>
+            <div class="card-role">order_events + fulfillments</div>
+          </div>
+        </div>
+        <ul class="touch-list">
+          <li>order_events gains: scheduled_date, time_window, notes</li>
+          <li>order_events gains: status field (pending → scheduled → fulfilled)</li>
+          <li>New collection: fulfillment_log <span class="tag tag-new">new</span></li>
+          <li>fulfillment_log: order_number, material, qty, staff, timestamp</li>
+          <li>All queryable — no schema migration needed</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Updated flow ── -->
+  <div class="flow-section">
+    <div class="flow-title">Updated delivery flow — phase 2</div>
+    <div class="flow-sub">Steps 1–5 are unchanged from phase 1. Phase 2 adds steps 6–9.</div>
+
+    <div class="flow-track">
+      <div class="flow-step">
+        <span class="step-pill pill-gray">1–5</span>
+        <div class="step-actor">Phase 1<br>unchanged</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-amber">6 — Queue</span>
+        <div class="step-actor">Greg sees order<br>in delivery queue</div>
+        <div class="step-new">new</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-amber">7 — Schedule</span>
+        <div class="step-actor">Greg calls customer,<br>logs date + time</div>
+        <div class="step-new">new</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-blue">8 — Notify</span>
+        <div class="step-actor">Customer gets<br>scheduled email</div>
+        <div class="step-new">new</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-teal">9 — Log</span>
+        <div class="step-actor">Yard staff logs<br>fulfillment at gate</div>
+        <div class="step-new">new</div>
+      </div>
+    </div>
+
+    <div class="flow-note">
+      Greg still makes the phone call — customer availability cannot be automated. Phase 2 just gives him a tool to record the outcome of that call and trigger the next step automatically.
+    </div>
+  </div>
+
+  <!-- ── Screen mockups ── -->
+  <div class="section-label">What the screens look like — rough sketch</div>
+  <div class="screens-section">
+    <div class="screens-grid">
+
+      <!-- Brian's queue -->
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-url">dispatch.agromin.com/deliveries</div>
+        </div>
+        <div class="screen-title">Greg's Delivery Queue</div>
+        <div class="screen-body">
+          <div class="queue-item">
+            <div class="queue-status qs-pending"></div>
+            <div class="queue-info">
+              <div class="queue-name">Martinez, R. — 417 Skyhigh Dr, Ventura</div>
+              <div class="queue-meta">20 cu yds · Cover Mulch · Order #108870</div>
+            </div>
+            <div class="queue-action qa-schedule">Schedule</div>
+          </div>
+          <div class="queue-item">
+            <div class="queue-status qs-called"></div>
+            <div class="queue-info">
+              <div class="queue-name">Chen, L. — 88 Rancho Rd, Irvine</div>
+              <div class="queue-meta">15 cu yds · Compost · Order #108901</div>
+            </div>
+            <div class="queue-action qa-schedule">Schedule</div>
+          </div>
+          <div class="queue-item">
+            <div class="queue-status qs-sched"></div>
+            <div class="queue-info">
+              <div class="queue-name">Patel, A. — 204 Oak St, Anaheim</div>
+              <div class="queue-meta">10 cu yds · Compost · Apr 22 · 8–10am</div>
+            </div>
+            <div class="queue-action qa-view">View</div>
+          </div>
+        </div>
+        <div class="screen-legend">
+          <div class="legend-item"><div class="queue-status qs-pending" style="width:8px;height:8px;border-radius:50%;background:#fac775"></div> Pending call</div>
+          <div class="legend-item"><div class="queue-status qs-called"  style="width:8px;height:8px;border-radius:50%;background:#378add"></div> Called</div>
+          <div class="legend-item"><div class="queue-status qs-sched"   style="width:8px;height:8px;border-radius:50%;background:#639922"></div> Scheduled</div>
+        </div>
+      </div>
+
+      <!-- Schedule form -->
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-url">dispatch.agromin.com/deliveries/108870</div>
+        </div>
+        <div class="screen-title">Schedule Delivery — Order #108870</div>
+        <div class="screen-body">
+          <div class="form-row">
+            <div class="form-label">Customer</div>
+            <div class="form-value">Martinez, R. — 805-555-0192</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Delivery address</div>
+            <div class="form-value">417 Skyhigh Dr, Ventura, CA</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Material / qty</div>
+            <div class="form-value">20 cu yds · Cover Mulch</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Confirmed delivery date</div>
+            <div class="form-input">Select date…</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Time window</div>
+            <div class="form-input">e.g. 8am–10am</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Notes</div>
+            <div class="form-input">Gate code, access notes…</div>
+          </div>
+          <button class="form-btn">Confirm &amp; send customer email</button>
+        </div>
+      </div>
+
+      <!-- Ofelia schedule view -->
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-url">dispatch.agromin.com/schedule</div>
+        </div>
+        <div class="screen-title">Delivery Schedule — Ofelia's View</div>
+        <div class="screen-body">
+          <div class="sched-week">Week of Apr 20, 2026</div>
+          <div class="sched-item">
+            <div class="sched-date">Tue Apr 22</div>
+            <div class="sched-info">
+              <div class="sched-name">Patel, A. — 204 Oak St, Anaheim</div>
+              <div class="sched-meta">10 cu yds Compost · 8–10am · #108901</div>
+            </div>
+          </div>
+          <div class="sched-item">
+            <div class="sched-date">Thu Apr 24</div>
+            <div class="sched-info">
+              <div class="sched-name">Kim, S. — 55 Hillcrest, Fullerton</div>
+              <div class="sched-meta">20 cu yds Cover Mulch · 1–3pm · #108915</div>
+            </div>
+          </div>
+          <div class="sched-item pending">
+            <div class="sched-date">TBD</div>
+            <div class="sched-info">
+              <div class="sched-name">Martinez, R. — 417 Skyhigh, Ventura</div>
+              <div class="sched-meta">20 cu yds Cover Mulch · awaiting customer · #108870</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Yard log -->
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-dot"></div>
+          <div class="screen-url">dispatch.agromin.com/yard-log</div>
+        </div>
+        <div class="screen-title">Yard Fulfillment Log — Staff Entry</div>
+        <div class="screen-body">
+          <div class="form-row">
+            <div class="form-label">Order number</div>
+            <div class="form-input">Scan or type order # →  auto-fills below</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Customer name</div>
+            <div class="form-value" style="color:#9b9b90;font-style:italic">Auto-filled from order</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Material loaded</div>
+            <div class="form-input">Compost / Cover Mulch</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Qty loaded (cu yds)</div>
+            <div class="form-input">Enter quantity</div>
+          </div>
+          <div class="form-row">
+            <div class="form-label">Staff initials</div>
+            <div class="form-input">Your initials</div>
+          </div>
+          <button class="form-btn" style="background:#1d9e75">Log fulfillment</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Greenery log ── -->
+  <div class="section-label">Greenery log — replacing shared Excel</div>
+  <div class="yard-section">
+    <div class="yard-grid">
+      <div>
+        <div class="yard-col-title">What the yard log captures</div>
+        <ul class="yard-list">
+          <li>Order number (links back to full order record)</li>
+          <li>Customer name (auto-filled)</li>
+          <li>Material type — compost or cover mulch</li>
+          <li>Quantity loaded in cubic yards</li>
+          <li>Yard location (Bowerman, Olinda, Prima Deshecha, etc.)</li>
+          <li>Staff initials</li>
+          <li>Timestamp (recorded automatically)</li>
+        </ul>
+      </div>
+      <div>
+        <div class="yard-col-title">What it replaces and adds</div>
+        <ul class="yard-list">
+          <li>Replaces shared Excel Greenery Log spreadsheet</li>
+          <li>Works on any tablet or phone at the gate</li>
+          <li>No file locking or version conflicts</li>
+          <li>All entries queryable in Firestore immediately</li>
+          <li>Export to CSV/Excel for OCWR compliance reporting</li>
+          <li>Agromin admin can pull reports by date range or yard</li>
+          <li>Prerequisite: confirm what OCWR actually requires in the log</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Build order ── -->
+  <div class="section-label">Suggested build order</div>
+  <div class="build-section">
+    <ol class="build-steps">
+      <li>
+        <div class="build-num">1</div>
+        <div class="build-body">
+          <div class="build-title">Confirm Greenery Log requirements with OCWR <span class="build-tag bt-prereq">prerequisite</span></div>
+          <div class="build-desc">Find out exactly what fields OCWR requires and what format they want for reporting. This determines whether the yard log is a simple form or needs a specific export format.</div>
+        </div>
+      </li>
+      <li>
+        <div class="build-num">2</div>
+        <div class="build-body">
+          <div class="build-title">Add POST /api/schedule-delivery endpoint <span class="build-tag bt-easy">easy</span></div>
+          <div class="build-desc">Updates the Firestore order record with confirmed date, time window, and notes. Triggers the "delivery scheduled" customer email. All the pieces are already in place from phase 1.</div>
+        </div>
+      </li>
+      <li>
+        <div class="build-num">3</div>
+        <div class="build-body">
+          <div class="build-title">Build Greg's delivery queue web page <span class="build-tag bt-easy">easy</span></div>
+          <div class="build-desc">A simple HTML page served by the dispatch service. Lists pending deliveries from Firestore. Schedule button opens the schedule form. No framework needed — plain HTML + the existing API.</div>
+        </div>
+      </li>
+      <li>
+        <div class="build-num">4</div>
+        <div class="build-body">
+          <div class="build-title">Build Ofelia's schedule view <span class="build-tag bt-easy">easy</span></div>
+          <div class="build-desc">Read-only page showing confirmed deliveries this week + next, plus a pending section. Queries Firestore directly. Replaces the Friday email summary from phase 1.</div>
+        </div>
+      </li>
+      <li>
+        <div class="build-num">5</div>
+        <div class="build-body">
+          <div class="build-title">Add yard fulfillment log form <span class="build-tag bt-medium">medium</span></div>
+          <div class="build-desc">Browser form for yard staff. Order number auto-fills customer details from Firestore. Writes to a new fulfillment_log collection. Requires confirming device availability at each yard gate.</div>
+        </div>
+      </li>
+      <li>
+        <div class="build-num">6</div>
+        <div class="build-body">
+          <div class="build-title">Add CSV/Excel export for OCWR reporting <span class="build-tag bt-medium">medium</span></div>
+          <div class="build-desc">GET endpoint that queries fulfillment_log by date range and returns a formatted CSV or Excel file. Format depends on what OCWR requires — confirm before building.</div>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <footer>
+    Agromin · OCWR Free Compost &amp; Mulch Program · Dispatch Phase 2: Delivery Scheduling · April 2026
+  </footer>
+
+</div>
+</body>
+</html>

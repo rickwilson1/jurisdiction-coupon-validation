@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCWR Program — Manual vs. Automated</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a18;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; }
+
+  header { margin-bottom: 40px; }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b6b62;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #1a1a18;
+    margin-bottom: 6px;
+  }
+
+  .subtitle { font-size: 14px; color: #6b6b62; line-height: 1.5; }
+
+  /* ── Metrics bar ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .metric {
+    background: #fff;
+    border: 1px solid #e8e8e0;
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .metric-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #9b9b90;
+    margin-bottom: 10px;
+  }
+
+  .metric-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .metric-before {
+    font-size: 13px;
+    color: #c04828;
+    font-weight: 500;
+    text-decoration: line-through;
+    text-decoration-color: #e0987a;
+  }
+
+  .metric-after {
+    font-size: 18px;
+    font-weight: 600;
+    color: #3b6d11;
+    letter-spacing: -0.02em;
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 4px;
+  }
+
+  /* ── Step-by-step contrast ── */
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddddd6;
+  }
+
+  .compare-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .col-label {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px 6px 0 0;
+    letter-spacing: 0.02em;
+  }
+
+  .col-label.before {
+    background: #fce8e8;
+    color: #8b1a1a;
+  }
+
+  .col-label.after {
+    background: #e8f5ee;
+    color: #1a6b3a;
+  }
+
+  .step-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .step-cell {
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid;
+    position: relative;
+  }
+
+  .step-cell.before {
+    background: #fffbfb;
+    border-color: #f5d0c8;
+  }
+
+  .step-cell.after {
+    background: #f7fdf9;
+    border-color: #c8e8d4;
+  }
+
+  .step-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #c0bfb8;
+    margin-bottom: 4px;
+    letter-spacing: 0.06em;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .step-cell.before .step-title { color: #4a1a14; }
+  .step-cell.after .step-title { color: #1a4a2a; }
+
+  .step-desc {
+    font-size: 12px;
+    color: #5a5a54;
+    line-height: 1.5;
+  }
+
+  .step-cell.after .step-desc { color: #2a4a34; opacity: 0.8; }
+
+  .who {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .who-person { background: #fff3e0; color: #8b5000; }
+  .who-auto   { background: #e8f5ee; color: #1a6b3a; }
+  .who-both   { background: #f0f0e8; color: #5a5a44; }
+
+  .eliminated {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: #3b6d11;
+    background: #d4edda;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Risk table ── */
+  .risk-section { margin-bottom: 40px; }
+
+  .risk-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e8e8e0;
+    font-size: 12px;
+  }
+
+  .risk-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 12px 16px;
+    text-align: left;
+    background: #f5f4f0;
+    border-bottom: 1px solid #e8e8e0;
+    color: #6b6b62;
+  }
+
+  .risk-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid #f0f0e8;
+    line-height: 1.4;
+    vertical-align: top;
+    color: #3a3a34;
+  }
+
+  .risk-table tr:last-child td { border-bottom: none; }
+
+  .risk-table td:first-child { font-weight: 500; color: #1a1a18; width: 20%; }
+
+  .pill {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+
+  .pill-high   { background: #fce8e8; color: #8b1a1a; }
+  .pill-low    { background: #e8f5ee; color: #1a6b3a; }
+  .pill-medium { background: #fff3e0; color: #8b5000; }
+  .pill-none   { background: #f0f0e8; color: #6b6b62; }
+
+  /* ── Time flow ── */
+  .timeline-section {
+    background: #fff;
+    border: 1px solid #e8e8e0;
+    border-radius: 10px;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+
+  .timeline-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 24px;
+  }
+
+  .tl-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .tl-event {
+    font-size: 12px;
+    font-weight: 500;
+    color: #1a1a18;
+    width: 200px;
+    flex-shrink: 0;
+  }
+
+  .tl-bar-wrap {
+    flex: 1;
+    position: relative;
+    height: 28px;
+  }
+
+  .tl-bar {
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    position: absolute;
+    left: 0;
+    white-space: nowrap;
+  }
+
+  .tl-manual { background: #fce8e8; color: #8b1a1a; }
+  .tl-auto   { background: #e8f5ee; color: #1a6b3a; }
+
+  .tl-divider {
+    height: 1px;
+    background: #e8e8e0;
+    margin: 18px 0;
+  }
+
+  footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #b0b0a6;
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #e0e0d8;
+  }
+
+  @media (max-width: 700px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .compare-header, .step-row { grid-template-columns: 1fr; }
+    .col-label.before { border-radius: 6px; }
+    .tl-event { width: 140px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Agromin / OCWR — Process improvement</div>
+    <h1>Manual vs. Automated Fulfillment</h1>
+    <p class="subtitle">Free Compost &amp; Mulch Program — what changes when the Cloud Run service goes live</p>
+  </header>
+
+  <!-- ── Metrics ── -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Time to customer email</div>
+      <div class="metric-row">
+        <div class="metric-before">hours</div>
+        <div class="metric-after">&lt;5 min</div>
+      </div>
+      <div class="metric-unit">order placed → instructions sent</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Staff touches per order</div>
+      <div class="metric-row">
+        <div class="metric-before">3–5</div>
+        <div class="metric-after">0</div>
+      </div>
+      <div class="metric-unit">Kendall/Emily + Ofelia + Greg (delivery)</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Delivery schedule</div>
+      <div class="metric-row">
+        <div class="metric-before">manual</div>
+        <div class="metric-after">auto</div>
+      </div>
+      <div class="metric-unit">Friday summary compiled and sent</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Audit trail</div>
+      <div class="metric-row">
+        <div class="metric-before">none</div>
+        <div class="metric-after">full</div>
+      </div>
+      <div class="metric-unit">every order logged to Firestore</div>
+    </div>
+  </div>
+
+  <!-- ── Step-by-step contrast ── -->
+  <div class="section-label" style="margin-bottom:12px;">Step-by-step — what happens after an order is placed</div>
+
+  <div class="compare-header">
+    <div class="col-label before">Current — manual process</div>
+    <div class="col-label after">Automated — Cloud Run + Power Automate</div>
+  </div>
+
+  <!-- Step 1 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 01</div>
+      <div class="step-title">Order confirmation email arrives at sales@agromin.com</div>
+      <div class="step-desc">Sits in shared inbox. Kendall or Emily sees it next time they check mail — could be hours, or next business day for after-hours orders.</div>
+      <span class="who who-person">Kendall / Emily</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">instant</span>
+      <div class="step-num">Step 01</div>
+      <div class="step-title">Power Automate trigger fires on new email</div>
+      <div class="step-desc">Trigger fires within seconds of CIMcloud sending the confirmation. No human needed to initiate processing.</div>
+      <span class="who who-auto">Automation</span>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 02</div>
+      <div class="step-title">Manually read and parse the order</div>
+      <div class="step-desc">Kendall/Emily reads the email, identifies the coupon code, checks the shipping method, looks up the quantity, and decides which workflow applies.</div>
+      <span class="who who-person">Kendall / Emily</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 02</div>
+      <div class="step-title">Order fields extracted and routed automatically</div>
+      <div class="step-desc">Power Automate parses coupon code, shipping method, and quantity from the email. Cloud Run applies routing logic: pickup vs. delivery, qty threshold, jurisdiction.</div>
+      <span class="who who-auto">Automation</span>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 03</div>
+      <div class="step-title">Manually select and send the correct email template</div>
+      <div class="step-desc">Must choose between "under 5 yards" or "over 5 yards" template, fill in order details, add the right yard address and hours, and send. One wrong choice = customer shows up to the wrong process.</div>
+      <span class="who who-person">Kendall / Emily</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 03</div>
+      <div class="step-title">Correct template selected and dispatched automatically</div>
+      <div class="step-desc">Cloud Run selects the template based on qty threshold, populates all fields (order #, yard address, hours, coupon), and sends via Microsoft Graph from sales@agromin.com. Deterministic — no human judgment required.</div>
+      <span class="who who-auto">Automation</span>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 04</div>
+      <div class="step-title">Manually CC Ofelia on every outbound email</div>
+      <div class="step-desc">Must remember to CC ofelia@agromin.com on every order. If forgotten, Ofelia loses visibility into active orders and cannot coordinate with yards.</div>
+      <span class="who who-person">Kendall / Emily</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 04</div>
+      <div class="step-title">Ofelia CC is hardcoded into every dispatch</div>
+      <div class="step-desc">CC to ofelia@agromin.com is baked into the email handler. Cannot be forgotten. All order types — pickup and delivery — include her automatically.</div>
+      <span class="who who-auto">Automation</span>
+    </div>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 05</div>
+      <div class="step-title">Delivery orders manually forwarded to Greg</div>
+      <div class="step-desc">Kendall/Emily must identify delivery orders, forward to greg@agromin.com, and manually add the delivery address to the SharePoint workbook. Prone to delays and omissions.</div>
+      <span class="who who-person">Kendall / Emily + Greg</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 05</div>
+      <div class="step-title">Greg auto-alerted; SharePoint row written automatically</div>
+      <div class="step-desc">Cloud Run detects delivery flag, sends Greg a structured alert with all order details, and writes the row to OCWR-Agromin Deliveries.xlsx via Graph API — all before anyone opens their inbox.</div>
+      <span class="who who-auto">Automation → Greg</span>
+    </div>
+  </div>
+
+  <!-- Step 6 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 06</div>
+      <div class="step-title">Greg manually compiles weekly delivery schedule</div>
+      <div class="step-desc">Every Friday, Greg reviews all delivery orders from the week, assembles a schedule, and emails Ofelia. Time-consuming, error-prone, and dependent on Greg being available.</div>
+      <span class="who who-person">Greg</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 06</div>
+      <div class="step-title">Friday schedule auto-compiled and sent to Ofelia</div>
+      <div class="step-desc">Cloud Scheduler triggers the delivery schedule endpoint every Friday at 4pm. Queries Firestore for the week's delivery orders, formats a summary, and sends it to Ofelia automatically. Greg reviews rather than compiles.</div>
+      <span class="who who-auto">Automation → Greg reviews</span>
+    </div>
+  </div>
+
+  <!-- Step 7 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 07</div>
+      <div class="step-title">Manifest slips filled out manually in Word</div>
+      <div class="step-desc">Greg or OCWR staff fills in the Manifest Slip.docx template for each delivery — order number, customer, material, hauler signature line. No consistent format, stored inconsistently.</div>
+      <span class="who who-person">Greg / OCWR staff</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">eliminated</span>
+      <div class="step-num">Step 07</div>
+      <div class="step-title">PDF manifest auto-generated per delivery order</div>
+      <div class="step-desc">Cloud Run generates a structured PDF manifest the moment a delivery order is ingested. Consistent format every time. Greg or hauler prints or downloads — no manual data entry.</div>
+      <span class="who who-auto">Automation → Greg prints</span>
+    </div>
+  </div>
+
+  <!-- Step 8 -->
+  <div class="step-row">
+    <div class="step-cell before">
+      <div class="step-num">Step 08</div>
+      <div class="step-title">No order audit trail</div>
+      <div class="step-desc">Order history lives in email threads and a shared spreadsheet. No way to query how many orders were processed, which jurisdictions are active, or whether a specific order was handled correctly.</div>
+      <span class="who who-person">—</span>
+    </div>
+    <div class="step-cell after">
+      <span class="eliminated">new</span>
+      <div class="step-num">Step 08</div>
+      <div class="step-title">Full order log in Firestore</div>
+      <div class="step-desc">Every order is written to Firestore with order number, coupon, jurisdiction, routing decision, and timestamp. Queryable for monthly OCWR reporting and abuse detection.</div>
+      <span class="who who-auto">Automation</span>
+    </div>
+  </div>
+
+  <!-- ── Time comparison ── -->
+  <div class="timeline-section" style="margin-top:32px;">
+    <div class="timeline-title">Time from order placed to customer receiving instructions</div>
+
+    <div class="tl-row">
+      <div class="tl-event">Business hours order</div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-manual" style="width:65%">Manual: 30 min – 3 hrs</div>
+      </div>
+    </div>
+    <div class="tl-row">
+      <div class="tl-event"></div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-auto" style="width:4%">Auto: &lt;5 min</div>
+      </div>
+    </div>
+
+    <div class="tl-divider"></div>
+
+    <div class="tl-row">
+      <div class="tl-event">After-hours order</div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-manual" style="width:100%">Manual: next business day (8–20 hrs)</div>
+      </div>
+    </div>
+    <div class="tl-row">
+      <div class="tl-event"></div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-auto" style="width:4%">Auto: &lt;5 min</div>
+      </div>
+    </div>
+
+    <div class="tl-divider"></div>
+
+    <div class="tl-row">
+      <div class="tl-event">Friday delivery schedule</div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-manual" style="width:45%">Manual: 1–2 hrs Greg's time</div>
+      </div>
+    </div>
+    <div class="tl-row">
+      <div class="tl-event"></div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar tl-auto" style="width:3%">Auto: 0 min</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Risk table ── -->
+  <div class="risk-section">
+    <div class="section-label">Error and risk profile</div>
+    <table class="risk-table">
+      <thead>
+        <tr>
+          <th>Risk</th>
+          <th>Manual exposure</th>
+          <th>Automated exposure</th>
+          <th>Manual</th>
+          <th>Automated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Wrong email template sent</td>
+          <td>Human selects template manually based on qty — easy to misjudge bulk vs. bagged</td>
+          <td>Routing logic is deterministic — same inputs always produce same output</td>
+          <td><span class="pill pill-high">HIGH</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>Ofelia not CC'd</td>
+          <td>Relies on Kendall/Emily remembering every time</td>
+          <td>Hardcoded in every email handler — cannot be omitted</td>
+          <td><span class="pill pill-medium">MEDIUM</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>Delivery order not forwarded to Greg</td>
+          <td>Manual step — easily missed in high-volume periods</td>
+          <td>Automatic on every delivery-type order</td>
+          <td><span class="pill pill-high">HIGH</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>After-hours order delay</td>
+          <td>Customer waits until next business day for instructions</td>
+          <td>Processed within 5 minutes regardless of time of day</td>
+          <td><span class="pill pill-high">HIGH</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>Wrong jurisdiction coupon accepted</td>
+          <td>No validation — Kendall/Emily may not catch a Sacramento coupon used in Orange County</td>
+          <td>Existing /api/validate-coupon catches jurisdiction mismatch at checkout</td>
+          <td><span class="pill pill-high">HIGH</span></td>
+          <td><span class="pill pill-low">LOW</span></td>
+        </tr>
+        <tr>
+          <td>Coupon abuse (address reuse)</td>
+          <td>No tracking — no way to detect repeated orders from same address</td>
+          <td>Firestore order log enables per-address order counting and flagging</td>
+          <td><span class="pill pill-high">HIGH</span></td>
+          <td><span class="pill pill-low">LOW</span></td>
+        </tr>
+        <tr>
+          <td>Friday schedule missed</td>
+          <td>Depends on Greg's availability every single Friday</td>
+          <td>Cloud Scheduler fires at 4pm Friday — no human dependency</td>
+          <td><span class="pill pill-medium">MEDIUM</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>Manifest slip errors</td>
+          <td>Manual Word doc fill-in — inconsistent fields, typos, missing info</td>
+          <td>Auto-generated from structured order data — consistent every time</td>
+          <td><span class="pill pill-medium">MEDIUM</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+        <tr>
+          <td>Monthly OCWR reporting gaps</td>
+          <td>Must reconstruct order history from email threads and spreadsheet</td>
+          <td>Firestore provides queryable order history with all relevant fields</td>
+          <td><span class="pill pill-medium">MEDIUM</span></td>
+          <td><span class="pill pill-none">NONE</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── What remains manual ── -->
+  <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:24px;margin-bottom:40px;">
+    <div style="font-size:13px;font-weight:600;color:#1a1a18;margin-bottom:16px;">What stays manual — by design</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:12px;color:#4a4a44;line-height:1.5;">
+      <div style="padding:14px;background:#fafaf6;border-radius:8px;border:1px solid #e8e8e0;">
+        <div style="font-weight:600;color:#1a1a18;margin-bottom:6px;">Physical ID verification</div>
+        Resident must present proof of address at the yard. Cannot be automated — it's the program's fraud control layer.
+      </div>
+      <div style="padding:14px;background:#fafaf6;border-radius:8px;border:1px solid #e8e8e0;">
+        <div style="font-weight:600;color:#1a1a18;margin-bottom:6px;">Material loading</div>
+        Self-load or OCWR staff — physical labor at the yard. Greenery log signed off by yard staff.
+      </div>
+      <div style="padding:14px;background:#fafaf6;border-radius:8px;border:1px solid #e8e8e0;">
+        <div style="font-weight:600;color:#1a1a18;margin-bottom:6px;">Coupon exception support</div>
+        Kendall/Emily handle edge cases: codes not working, address mismatches, customer questions. Volume drops sharply once routing is automated.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Agromin · OCWR Free Compost &amp; Mulch Program · Internal reference · April 2026
+  </footer>
+
+</div>
+</body>
+</html>

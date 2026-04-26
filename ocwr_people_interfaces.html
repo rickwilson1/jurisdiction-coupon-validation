@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCWR Compost Program — People &amp; Interfaces</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a18;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 40px;
+  }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b6b62;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #1a1a18;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: #6b6b62;
+    line-height: 1.5;
+  }
+
+  /* ── Actor cards ── */
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddddd6;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid #e8e8e0;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0e8;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a18;
+    line-height: 1.2;
+  }
+
+  .card-role {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 1px;
+  }
+
+  .touch-list {
+    list-style: none;
+  }
+
+  .touch-list li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0;
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .touch-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 1px;
+    background: #c8c8c0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    letter-spacing: 0.04em;
+  }
+
+  .tag-auto { background: #e8f5ee; color: #1a6b3a; }
+  .tag-manual { background: #fff3e0; color: #8b5000; }
+  .tag-except { background: #fce8e8; color: #8b1a1a; }
+
+  /* ── Order lifecycle flow ── */
+  .flow-section {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e0;
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+
+  .flow-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a18;
+    margin-bottom: 24px;
+  }
+
+  .flow-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 20px;
+  }
+
+  .flow-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+
+  .flow-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    right: -1px;
+    width: calc(100% - 60px);
+    height: 1px;
+    background: #ddddd6;
+    left: calc(50% + 22px);
+  }
+
+  .step-pill {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    position: relative;
+    z-index: 1;
+    background: #fff;
+  }
+
+  .step-actor {
+    font-size: 11px;
+    color: #9b9b90;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+
+  .pill-blue   { color: #185fa5; border-color: #b5d4f4; background: #e6f1fb; }
+  .pill-gray   { color: #5f5e5a; border-color: #d3d1c7; background: #f1efe8; }
+  .pill-green  { color: #3b6d11; border-color: #c0dd97; background: #eaf3de; }
+  .pill-amber  { color: #854f0b; border-color: #fac775; background: #faeeda; }
+  .pill-purple { color: #534ab7; border-color: #cec bf6; background: #eeedfe; }
+
+  .flow-branch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .branch-card {
+    background: #fafaf6;
+    border: 1px solid #e8e8e0;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .branch-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  .branch-steps {
+    list-style: none;
+  }
+
+  .branch-steps li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 3px 0;
+    padding-left: 12px;
+    position: relative;
+  }
+
+  .branch-steps li::before {
+    content: counter(step);
+    counter-increment: step;
+    position: absolute;
+    left: 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: #9b9b90;
+    top: 4px;
+  }
+
+  .branch-pickup { counter-reset: step; }
+  .branch-delivery { counter-reset: step; }
+
+  /* ── Automation summary ── */
+  .auto-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .auto-card {
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid;
+  }
+
+  .auto-card.manual {
+    background: #fffbf5;
+    border-color: #fac775;
+  }
+
+  .auto-card.automated {
+    background: #f5fdf7;
+    border-color: #c0dd97;
+  }
+
+  .auto-header {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  .auto-card.manual .auto-header { color: #854f0b; }
+  .auto-card.automated .auto-header { color: #3b6d11; }
+
+  .auto-items {
+    list-style: none;
+  }
+
+  .auto-items li {
+    font-size: 12px;
+    color: #4a4a44;
+    padding: 4px 0;
+    padding-left: 14px;
+    position: relative;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    line-height: 1.4;
+  }
+
+  .auto-items li:last-child { border-bottom: none; }
+
+  .auto-card.manual .auto-items li::before {
+    content: '○';
+    position: absolute;
+    left: 0;
+    font-size: 10px;
+    color: #ba7517;
+    top: 4px;
+  }
+
+  .auto-card.automated .auto-items li::before {
+    content: '●';
+    position: absolute;
+    left: 0;
+    font-size: 10px;
+    color: #3b6d11;
+    top: 4px;
+  }
+
+  footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #b0b0a6;
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #e0e0d8;
+  }
+
+  /* color dots */
+  .d-blue   { background: #378add; }
+  .d-teal   { background: #1d9e75; }
+  .d-purple { background: #7f77dd; }
+  .d-amber  { background: #ba7517; }
+  .d-green  { background: #639922; }
+  .d-coral  { background: #d85a30; }
+
+  @media (max-width: 680px) {
+    .cards-grid { grid-template-columns: 1fr 1fr; }
+    .auto-section { grid-template-columns: 1fr; }
+    .flow-branch { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+  }
+
+  @media (max-width: 460px) {
+    .cards-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Agromin / OCWR — Internal operations reference</div>
+    <h1>Free Compost &amp; Mulch Program</h1>
+    <p class="subtitle">People, interfaces, and responsibilities across the order fulfillment workflow</p>
+  </header>
+
+  <!-- ── Actor cards ── -->
+  <div class="section-label">Who does what</div>
+  <div class="cards-grid">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-blue"></div>
+        <div>
+          <div class="card-name">Resident</div>
+          <div class="card-role">Orange County customer</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>shop.agromin.com — place order</li>
+        <li>Enter jurisdiction coupon code</li>
+        <li>Receive email confirmation</li>
+        <li>Bring ID / utility bill to yard</li>
+        <li>QR scan at self-load station</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-teal"></div>
+        <div>
+          <div class="card-name">Kendall / Emily</div>
+          <div class="card-role">Sales support</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>sales@agromin.com inbox</li>
+        <li>Coupon code exception support <span class="tag tag-except">only</span></li>
+        <li>CIMcloud worker portal — order lookup</li>
+        <li>Escalation to Ofelia when needed</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-purple"></div>
+        <div>
+          <div class="card-name">Ofelia</div>
+          <div class="card-role">Operations coordinator</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>CC'd on every order email</li>
+        <li>Greenery log review &amp; sign-off</li>
+        <li>Pickup coordination across yards</li>
+        <li>Weekly delivery schedule review</li>
+        <li>Abuse flag escalation</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-amber"></div>
+        <div>
+          <div class="card-name">Greg Jackson</div>
+          <div class="card-role">Delivery coordinator</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Email alert for each delivery order <span class="tag tag-auto">auto</span></li>
+        <li>Calls customer to schedule</li>
+        <li>SharePoint delivery log <span class="tag tag-auto">auto</span></li>
+        <li>Hauler manifest PDF <span class="tag tag-auto">auto</span></li>
+        <li>Friday summary to Ofelia <span class="tag tag-auto">auto</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-green"></div>
+        <div>
+          <div class="card-name">OCWR yard staff</div>
+          <div class="card-role">Fulfillment at yard</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Verify email confirmation + ID</li>
+        <li>QR scan confirmation</li>
+        <li>Weigh / load material</li>
+        <li>Greenery log entry</li>
+        <li>Sign hauler manifest (delivery)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot d-coral"></div>
+        <div>
+          <div class="card-name">Admin (Rick)</div>
+          <div class="card-role">Program management</div>
+        </div>
+      </div>
+      <ul class="touch-list">
+        <li>Upload coupons.xlsx → goes live in 5 min</li>
+        <li>Cloud Run / GCP monitoring</li>
+        <li>Manual validation form</li>
+        <li>Firestore order audit log</li>
+        <li>Add new jurisdictions</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ── Order lifecycle ── -->
+  <div class="flow-section">
+    <div class="flow-title">Order lifecycle — who touches what, in sequence</div>
+
+    <div class="flow-track">
+      <div class="flow-step">
+        <span class="step-pill pill-blue">1 — Order placed</span>
+        <div class="step-actor">Resident on<br>shop.agromin.com</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-gray">2 — Route</span>
+        <div class="step-actor">Automation<br>Power Automate →<br>Cloud Run</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-blue">3 — Confirm email</span>
+        <div class="step-actor">Resident receives<br>pickup or delivery<br>instructions</div>
+      </div>
+      <div class="flow-step">
+        <span class="step-pill pill-purple">4 — Ofelia CC</span>
+        <div class="step-actor">On all order<br>emails</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:#9b9b90;margin-bottom:12px;margin-top:4px;">Step 5 — Fulfillment splits by order type</div>
+
+    <div class="flow-branch">
+
+      <div class="branch-card">
+        <div class="branch-label" style="color:#3b6d11;">Pickup path</div>
+        <ol class="branch-steps branch-pickup" style="list-style:none">
+          <li>Customer arrives at assigned yard</li>
+          <li>Presents email confirmation + ID</li>
+          <li>&lt;5 yds: QR scan → self-load with 5-gal buckets</li>
+          <li>≥5 yds: OCWR staff loads with equipment</li>
+          <li>OCWR logs fulfillment in Greenery Log</li>
+        </ol>
+      </div>
+
+      <div class="branch-card">
+        <div class="branch-label" style="color:#854f0b;">Delivery path</div>
+        <ol class="branch-steps branch-delivery" style="list-style:none">
+          <li>Greg receives auto-alert + SharePoint log entry</li>
+          <li>Greg calls customer to schedule</li>
+          <li>Hauler receives PDF manifest</li>
+          <li>OCWR signs manifest at pickup</li>
+          <li>Greg emails Ofelia Friday delivery schedule</li>
+        </ol>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Automation summary ── -->
+  <div class="section-label">What is automated vs. manual</div>
+  <div class="auto-section">
+
+    <div class="auto-card automated">
+      <div class="auto-header">Automated (Cloud Run + Power Automate)</div>
+      <ul class="auto-items">
+        <li>Coupon code validation against jurisdiction</li>
+        <li>Routing logic (pickup vs. delivery, qty threshold)</li>
+        <li>Customer confirmation email dispatch</li>
+        <li>CC to Ofelia on all orders</li>
+        <li>Greg alert email for delivery orders</li>
+        <li>SharePoint delivery log write-back</li>
+        <li>Hauler manifest PDF generation</li>
+        <li>Friday delivery schedule compilation</li>
+        <li>Firestore audit log per order</li>
+        <li>Coupon file updates (5-min cache)</li>
+      </ul>
+    </div>
+
+    <div class="auto-card manual">
+      <div class="auto-header">Remains manual</div>
+      <ul class="auto-items">
+        <li>ID / address verification at yard gate</li>
+        <li>Material loading (self or staff)</li>
+        <li>Greenery Log entry by OCWR staff</li>
+        <li>Greg phone call to schedule delivery</li>
+        <li>Hauler manifest physical signature</li>
+        <li>Coupon exception support (Kendall/Emily)</li>
+        <li>Abuse investigation and escalation</li>
+        <li>Monthly reporting review (Agromin)</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <footer>
+    Agromin · OCWR Free Compost &amp; Mulch Program · Internal reference · April 2026
+  </footer>
+
+</div>
+</body>
+</html>

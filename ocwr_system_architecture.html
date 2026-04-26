@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCWR Coupon System — Architecture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#0a0c12;color:#e0ddd6;min-height:100vh;padding:40px 24px}
+.page{max-width:1040px;margin:0 auto}
+
+/* Header */
+header{margin-bottom:40px}
+.eyebrow{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#4a9e6b;margin-bottom:8px}
+h1{font-size:28px;font-weight:600;letter-spacing:-.025em;color:#f0ede6;margin-bottom:6px}
+.subtitle{font-size:13px;color:#5a5a54}
+
+/* Diagram canvas */
+.diagram{position:relative;width:100%}
+
+/* Layer rows */
+.layer{margin-bottom:0;position:relative}
+.layer-inner{display:flex;align-items:stretch;gap:10px;padding:20px;border-radius:0;position:relative;z-index:1}
+.layer:first-child .layer-inner{border-radius:12px 12px 0 0}
+
+.layer-label{font-family:'DM Mono',monospace;font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);padding:0 4px;opacity:.6;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;justify-content:center;min-width:28px}
+
+/* Connector rows */
+.connector-row{display:flex;align-items:center;justify-content:center;gap:0;height:36px;position:relative;z-index:0}
+.connector{display:flex;flex-direction:column;align-items:center;gap:0;flex:1;position:relative}
+.conn-line{width:1px;height:20px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.15))}
+.conn-arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid rgba(255,255,255,.2)}
+.conn-label{font-family:'DM Mono',monospace;font-size:9px;color:#3a3a38;position:absolute;top:8px;left:50%;transform:translateX(-50%);white-space:nowrap;letter-spacing:.06em}
+
+/* Component boxes */
+.comp{border-radius:8px;padding:14px 16px;border:1px solid;position:relative;flex:1;min-width:0}
+.comp-name{font-size:12px;font-weight:600;margin-bottom:3px;line-height:1.2}
+.comp-sub{font-size:10px;opacity:.55;line-height:1.3;font-family:'DM Mono',monospace}
+.comp-tag{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;padding:1px 5px;border-radius:3px;margin-top:6px;letter-spacing:.05em}
+.comp-details{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
+.comp-detail-item{font-size:11px;color:#6a6a64;padding:2px 0;padding-left:12px;position:relative;line-height:1.4}
+.comp-detail-item::before{content:'';position:absolute;left:0;top:8px;width:5px;height:1px;background:#3a3a38}
+
+/* Layer color themes */
+.layer-external{background:rgba(55,138,221,.06);border:1px solid rgba(55,138,221,.12)}
+.layer-external .layer-label{color:#5aabf5}
+.comp-browser{background:rgba(55,138,221,.08);border-color:rgba(55,138,221,.2)}
+.comp-browser .comp-name{color:#5aabf5}
+.comp-cimcloud{background:rgba(55,138,221,.1);border-color:rgba(55,138,221,.25)}
+.comp-cimcloud .comp-name{color:#7ac0f8}
+
+.layer-m365{background:rgba(127,119,221,.06);border:1px solid rgba(127,119,221,.12)}
+.layer-m365 .layer-label{color:#a89ff0}
+.comp-inbox{background:rgba(127,119,221,.08);border-color:rgba(127,119,221,.2)}
+.comp-inbox .comp-name{color:#a89ff0}
+.comp-pa{background:rgba(127,119,221,.12);border-color:rgba(127,119,221,.28)}
+.comp-pa .comp-name{color:#c0b8f8}
+
+.layer-gcp{background:rgba(99,153,34,.05);border:1px solid rgba(99,153,34,.12)}
+.layer-gcp .layer-label{color:#8acf45}
+
+/* Cloud Run container */
+.cloudrun-container{flex:1;background:rgba(99,153,34,.05);border:1px solid rgba(99,153,34,.18);border-radius:10px;padding:14px;position:relative}
+.cloudrun-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(99,153,34,.12)}
+.cloudrun-title{font-size:12px;font-weight:600;color:#8acf45}
+.cloudrun-sub{font-family:'DM Mono',monospace;font-size:9px;color:#4a6a28;margin-left:auto}
+.endpoints{display:flex;gap:8px;flex-wrap:wrap}
+.endpoint{background:rgba(99,153,34,.08);border:1px solid rgba(99,153,34,.2);border-radius:6px;padding:10px 12px;flex:1;min-width:140px}
+.ep-method{font-family:'DM Mono',monospace;font-size:9px;font-weight:500;color:#5a9a20;margin-bottom:3px;letter-spacing:.06em}
+.ep-path{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#a8cf70;margin-bottom:4px}
+.ep-desc{font-size:10px;color:#5a6a50;line-height:1.3}
+.ep-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:8px;padding:1px 4px;border-radius:2px;margin-top:4px;letter-spacing:.04em}
+.badge-existing{background:rgba(99,153,34,.15);color:#7abf40}
+.badge-new{background:rgba(240,184,74,.15);color:#f0b84a}
+
+/* Scheduler (within GCP layer) */
+.comp-scheduler{background:rgba(29,158,117,.08);border-color:rgba(29,158,117,.22)}
+.comp-scheduler .comp-name{color:#3dd4a0}
+
+/* GCP Actions side panel */
+.gcp-actions{display:flex;flex-direction:column;gap:8px;width:160px;flex-shrink:0}
+.action-box{background:rgba(99,153,34,.06);border:1px solid rgba(99,153,34,.14);border-radius:7px;padding:10px 12px}
+.action-title{font-size:11px;font-weight:600;color:#7abf40;margin-bottom:3px}
+.action-sub{font-size:10px;color:#4a6a38;line-height:1.3}
+
+/* Storage layer */
+.layer-storage{background:rgba(186,117,23,.05);border:1px solid rgba(186,117,23,.1)}
+.layer-storage .layer-label{color:#f0b84a}
+.comp-gcs{background:rgba(186,117,23,.08);border-color:rgba(186,117,23,.22)}
+.comp-gcs .comp-name{color:#f0b84a}
+.comp-firestore{background:rgba(240,130,74,.08);border-color:rgba(240,130,74,.22)}
+.comp-firestore .comp-name{color:#f0946a}
+.comp-secrets{background:rgba(186,117,23,.06);border-color:rgba(186,117,23,.16)}
+.comp-secrets .comp-name{color:#d0a040}
+.comp-cdtfa{background:rgba(150,100,20,.06);border-color:rgba(150,100,20,.16)}
+.comp-cdtfa .comp-name{color:#b89040}
+
+/* External API layer */
+.layer-ext{background:rgba(216,90,48,.05);border:1px solid rgba(216,90,48,.1)}
+.layer-ext .layer-label{color:#f08060}
+.comp-arcgis{background:rgba(216,90,48,.08);border-color:rgba(216,90,48,.22)}
+.comp-arcgis .comp-name{color:#f08060}
+.comp-smtp{background:rgba(200,80,60,.08);border-color:rgba(200,80,60,.2)}
+.comp-smtp .comp-name{color:#e87060}
+
+/* Output layer */
+.layer-output{background:rgba(127,119,221,.04);border:1px solid rgba(127,119,221,.1);border-radius:0 0 12px 12px}
+.layer-output .layer-label{color:#a89ff0}
+.comp-email-out{background:rgba(55,138,221,.07);border-color:rgba(55,138,221,.18)}
+.comp-email-out .comp-name{color:#5aabf5}
+.comp-sharepoint{background:rgba(127,119,221,.08);border-color:rgba(127,119,221,.2)}
+.comp-sharepoint .comp-name{color:#a89ff0}
+.comp-schedule{background:rgba(29,158,117,.07);border-color:rgba(29,158,117,.18)}
+.comp-schedule .comp-name{color:#3dd4a0}
+.comp-github{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
+.comp-github .comp-name{color:#888880}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;padding:16px 20px;background:#0f1117;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#5a5a54}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Data flow annotations */
+.flow-note{font-family:'DM Mono',monospace;font-size:9px;color:#3a4a3a;text-align:center;padding:4px 0;letter-spacing:.05em}
+
+/* Divider between layers */
+.layer+.layer{border-top:none}
+.layer:not(:last-child){border-bottom:none}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <div class="eyebrow">Agromin × OCWR — Technical reference</div>
+  <h1>System Architecture</h1>
+  <p class="subtitle">Free Compost &amp; Mulch Program — order routing automation</p>
+</header>
+
+<div class="diagram">
+
+  <!-- ── Layer 1: External ── -->
+  <div class="layer layer-external">
+    <div class="layer-inner">
+      <div class="layer-label">External</div>
+
+      <div class="comp comp-browser" style="max-width:180px">
+        <div class="comp-name">Customer browser</div>
+        <div class="comp-sub">Orange County resident</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Enters jurisdiction coupon code</div>
+          <div class="comp-detail-item">Selects pickup or delivery</div>
+          <div class="comp-detail-item">Receives confirmation email</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;padding:0 4px;color:rgba(255,255,255,.15);font-size:18px;flex-shrink:0">→</div>
+
+      <div class="comp comp-cimcloud">
+        <div class="comp-name">shop.agromin.com</div>
+        <div class="comp-sub">CIMcloud — sitename: AGROMIN</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Validates coupon via /api/validate-coupon</div>
+          <div class="comp-detail-item">Processes $0.00 order (coupon offsets total)</div>
+          <div class="comp-detail-item">Sends "Pending Approval" email on order placed</div>
+          <div class="comp-detail-item">Delivery orders charge separate shipping fee</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;padding:0 4px;color:rgba(255,255,255,.1);font-size:18px;flex-shrink:0">→</div>
+
+      <div class="comp comp-cimcloud" style="max-width:220px">
+        <div class="comp-name">Order confirmation email</div>
+        <div class="comp-sub">From: Sales@agromin.com</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Subject: "Pending Approval for Order #XXXXXX"</div>
+          <div class="comp-detail-item">Contains: Coupon Code, Shipping Method, Qty, SKU</div>
+          <div class="comp-detail-item">CC: sales@agromin.com (trigger point)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- connector -->
+  <div class="connector-row">
+    <div style="flex:1"></div>
+    <div class="connector" style="flex:0 0 auto;width:200px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">email arrives in sales@agromin.com</div>
+    </div>
+    <div style="flex:1"></div>
+  </div>
+
+  <!-- ── Layer 2: M365 / Power Automate ── -->
+  <div class="layer layer-m365">
+    <div class="layer-inner">
+      <div class="layer-label">M365</div>
+
+      <div class="comp comp-inbox" style="max-width:200px">
+        <div class="comp-name">sales@agromin.com</div>
+        <div class="comp-sub">Shared mailbox — M365</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Trigger filter: From = Sales@agromin.com</div>
+          <div class="comp-detail-item">Subject starts with "Pending Approval for Order"</div>
+          <div class="comp-detail-item">Body contains "Coupon Code:" (excludes paid orders)</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;padding:0 4px;color:rgba(255,255,255,.15);font-size:18px;flex-shrink:0">→</div>
+
+      <div class="comp comp-pa">
+        <div class="comp-name">Power Automate</div>
+        <div class="comp-sub">Trigger: When email arrives in shared mailbox</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Parse: order_number, coupon_code, customer_email</div>
+          <div class="comp-detail-item">Parse: shipping_method, qty, billing_address, SKU</div>
+          <div class="comp-detail-item">POST → Cloud Run /api/ingest-order</div>
+          <div class="comp-detail-item">On response: send email + write SharePoint row</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- connector -->
+  <div class="connector-row">
+    <div style="flex:1"></div>
+    <div class="connector" style="flex:0 0 auto;width:200px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">POST /api/ingest-order (X-API-Key auth)</div>
+    </div>
+    <div style="flex:1"></div>
+  </div>
+
+  <!-- ── Layer 3: GCP / Cloud Run ── -->
+  <div class="layer layer-gcp">
+    <div class="layer-inner" style="flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:stretch">
+        <div class="layer-label">GCP</div>
+
+        <!-- Cloud Run service container -->
+        <div class="cloudrun-container">
+          <div class="cloudrun-header">
+            <div class="cloudrun-title">Cloud Run — coupon-validator</div>
+            <div class="cloudrun-sub">coupon-validator-751008504644.us-west1.run.app</div>
+          </div>
+          <div class="endpoints">
+
+            <div class="endpoint">
+              <div class="ep-method">GET</div>
+              <div class="ep-path">/api/validate-coupon</div>
+              <div class="ep-desc">Coupon + address → jurisdiction match. Called by CIMcloud at checkout.</div>
+              <div class="ep-badge badge-existing">existing</div>
+            </div>
+
+            <div class="endpoint">
+              <div class="ep-method">POST</div>
+              <div class="ep-path">/api/ingest-order</div>
+              <div class="ep-desc">Routing logic: pickup vs. delivery, qty threshold, template selection, Firestore log.</div>
+              <div class="ep-badge badge-new">new</div>
+            </div>
+
+            <div class="endpoint">
+              <div class="ep-method">POST</div>
+              <div class="ep-path">/api/generate-manifest</div>
+              <div class="ep-desc">Returns signed PDF manifest for delivery haulers. reportlab, no system deps.</div>
+              <div class="ep-badge badge-new">new</div>
+            </div>
+
+            <div class="endpoint">
+              <div class="ep-method">GET</div>
+              <div class="ep-path">/api/delivery-schedule</div>
+              <div class="ep-desc">Queries Firestore for week's delivery orders. Called by Cloud Scheduler Friday 4pm.</div>
+              <div class="ep-badge badge-new">new</div>
+            </div>
+
+            <div class="endpoint">
+              <div class="ep-method">POST</div>
+              <div class="ep-path">/api/upload-coupons</div>
+              <div class="ep-desc">Admin: accepts xlsx/csv upload, writes to GCS, refreshes 5-min cache.</div>
+              <div class="ep-badge badge-existing">existing</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Cloud Scheduler side -->
+        <div style="display:flex;flex-direction:column;gap:8px;width:170px;flex-shrink:0">
+          <div class="comp comp-scheduler">
+            <div class="comp-name">Cloud Scheduler</div>
+            <div class="comp-sub">Cron: Friday 16:00 PT</div>
+            <div class="comp-details">
+              <div class="comp-detail-item">GET /api/delivery-schedule</div>
+              <div class="comp-detail-item">Response → PA → email Ofelia</div>
+            </div>
+          </div>
+          <div class="comp comp-github" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08)">
+            <div class="comp-name" style="color:#888880">GitHub Actions</div>
+            <div class="comp-sub">.github/workflows/</div>
+            <div class="comp-details">
+              <div class="comp-detail-item">Push to main → build + deploy</div>
+              <div class="comp-detail-item">Docker → Artifact Registry</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- connector -->
+  <div class="connector-row" style="justify-content:flex-start;padding-left:60px;gap:40px">
+    <div class="connector" style="flex:0 0 auto;width:120px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">reads coupons</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:120px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">writes order log</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:120px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">reads env secrets</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:120px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">bundled in image</div>
+    </div>
+  </div>
+
+  <!-- ── Layer 4: Storage ── -->
+  <div class="layer layer-storage">
+    <div class="layer-inner">
+      <div class="layer-label">Storage</div>
+
+      <div class="comp comp-gcs">
+        <div class="comp-name">Cloud Storage</div>
+        <div class="comp-sub">gs://agromin-coupon-data</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">coupons.xlsx — 83 active codes</div>
+          <div class="comp-detail-item">5-min TTL cache in Cloud Run</div>
+          <div class="comp-detail-item">Updated via /api/upload-coupons</div>
+        </div>
+      </div>
+
+      <div class="comp comp-firestore">
+        <div class="comp-name">Firestore</div>
+        <div class="comp-sub">collection: order_events</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Doc ID = order_number (dedup)</div>
+          <div class="comp-detail-item">Fields: coupon, jurisdiction, routing, timestamp</div>
+          <div class="comp-detail-item">Powers delivery schedule + abuse detection</div>
+        </div>
+      </div>
+
+      <div class="comp comp-secrets">
+        <div class="comp-name">Secret Manager</div>
+        <div class="comp-sub">GCP — env vars at runtime</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">SMTP_USER / SMTP_PASSWORD</div>
+          <div class="comp-detail-item">ARCGIS_API_KEY</div>
+          <div class="comp-detail-item">UPLOAD_API_KEY</div>
+        </div>
+      </div>
+
+      <div class="comp comp-cdtfa">
+        <div class="comp-name">CDTFA Shapefile</div>
+        <div class="comp-sub">Bundled in container image</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">CDTFA_TaxDistricts.gpkg (26MB)</div>
+          <div class="comp-detail-item">Loaded once at startup via lru_cache</div>
+          <div class="comp-detail-item">City + county + unincorporated matching</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- connector -->
+  <div class="connector-row" style="justify-content:flex-start;padding-left:60px;gap:60px">
+    <div class="connector" style="flex:0 0 auto;width:100px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">geocode address</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:100px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">send via SMTP</div>
+    </div>
+  </div>
+
+  <!-- ── Layer 5: External APIs + SMTP ── -->
+  <div class="layer layer-ext">
+    <div class="layer-inner">
+      <div class="layer-label">External</div>
+
+      <div class="comp comp-arcgis">
+        <div class="comp-name">ArcGIS Geocoder</div>
+        <div class="comp-sub">geocode-api.arcgis.com</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Address → lat/lon + matched address string</div>
+          <div class="comp-detail-item">Auth: ARCGIS_API_KEY (Secret Manager)</div>
+          <div class="comp-detail-item">Used by /validate-coupon + /ingest-order</div>
+        </div>
+      </div>
+
+      <div class="comp comp-smtp">
+        <div class="comp-name">M365 SMTP Relay</div>
+        <div class="comp-sub">smtp.office365.com:587 STARTTLS</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Sends from: sales@agromin.com</div>
+          <div class="comp-detail-item">Auth: SMTP_USER + SMTP_PASSWORD (app password)</div>
+          <div class="comp-detail-item">CC: ofelia@agromin.com hardcoded on all orders</div>
+          <div class="comp-detail-item">No Azure app registration required</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- connector -->
+  <div class="connector-row" style="justify-content:center;gap:60px">
+    <div class="connector" style="flex:0 0 auto;width:130px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">customer instructions</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:130px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">PA native action</div>
+    </div>
+    <div class="connector" style="flex:0 0 auto;width:130px">
+      <div class="conn-line"></div>
+      <div class="conn-arrow"></div>
+      <div class="conn-label">Friday 4pm cron</div>
+    </div>
+  </div>
+
+  <!-- ── Layer 6: Outputs ── -->
+  <div class="layer layer-output">
+    <div class="layer-inner">
+      <div class="layer-label">Outputs</div>
+
+      <div class="comp comp-email-out">
+        <div class="comp-name">Customer email</div>
+        <div class="comp-sub">Pickup or delivery instructions</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">&lt;5 yds: self-loading template + yard QR code</div>
+          <div class="comp-detail-item">≥5 yds: staff-load template + truck requirement</div>
+          <div class="comp-detail-item">Delivery: acknowledgment + Greg will call</div>
+        </div>
+      </div>
+
+      <div class="comp comp-email-out">
+        <div class="comp-name">Greg alert email</div>
+        <div class="comp-sub">Delivery orders only</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Structured: order #, address, material, qty</div>
+          <div class="comp-detail-item">Sent to greg@agromin.com</div>
+          <div class="comp-detail-item">PDF manifest attached</div>
+        </div>
+      </div>
+
+      <div class="comp comp-sharepoint">
+        <div class="comp-name">SharePoint delivery log</div>
+        <div class="comp-sub">OCWRxAgromin — Deliveries.xlsx</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Row written per delivery order via PA</div>
+          <div class="comp-detail-item">File ID: 8284497A-4ABA-44CA-B631...</div>
+          <div class="comp-detail-item">Existing workbook — no new file created</div>
+        </div>
+      </div>
+
+      <div class="comp comp-schedule">
+        <div class="comp-name">Weekly delivery schedule</div>
+        <div class="comp-sub">To Ofelia — every Friday 4pm</div>
+        <div class="comp-details">
+          <div class="comp-detail-item">Aggregates Firestore delivery events for next week</div>
+          <div class="comp-detail-item">Formatted summary → Power Automate → email</div>
+          <div class="comp-detail-item">Replaces Greg's manual Friday compilation</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /diagram -->
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#5aabf5"></div>External / CIMcloud</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a89ff0"></div>M365 / Power Automate</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8acf45"></div>GCP Cloud Run</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f0b84a"></div>GCP Storage (GCS / Firestore)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f08060"></div>External APIs / SMTP</div>
+  <div class="legend-item" style="margin-left:auto">
+    <div style="display:inline-block;background:rgba(99,153,34,.15);color:#7abf40;font-family:'DM Mono',monospace;font-size:9px;padding:1px 5px;border-radius:2px;margin-right:6px">existing</div>
+    Endpoint already deployed
+  </div>
+  <div class="legend-item">
+    <div style="display:inline-block;background:rgba(240,184,74,.15);color:#f0b84a;font-family:'DM Mono',monospace;font-size:9px;padding:1px 5px;border-radius:2px;margin-right:6px">new</div>
+    Endpoint to be built
+  </div>
+</div>
+
+<div style="font-family:'DM Mono',monospace;font-size:11px;color:#2a2a24;text-align:center;padding-top:24px">
+  Agromin · OCWR Free Compost &amp; Mulch Program · System Architecture · April 2026
+</div>
+
+</div>
+</body>
+</html>
