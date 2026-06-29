@@ -54,7 +54,7 @@ Single-file FastAPI service (`main.py`, ~700 lines) deployed on Cloud Run.
 - CDTFA shapefile bundled in container: `CDTFA_TaxDistricts.gpkg` (26MB, loaded at startup)
 - CORS configured for `shop.agromin.com`, `commercial.agromin.com`, staging domains
 - Auth pattern: `UPLOAD_API_KEY` checked via `X-API-Key` header — reuse this for all new endpoints
-- Deployed via GitHub Actions (`.github/workflows/`)
+- Deployed manually via `gcloud run deploy --source .` (no auto-deploy; the only `.github/workflows/` file is the scheduled CDTFA data updater)
 
 **Key existing functions to reuse — do not rewrite:**
 - `load_coupons()` — loads coupon dict from GCS/local, 5-min TTL cache
@@ -427,7 +427,7 @@ Build and test in this sequence. Do not proceed to next step until current step 
 6. Add Greg alert email for delivery orders
 7. Add `POST /api/generate-manifest` with reportlab PDF
 8. Add `GET /api/delivery-schedule` Firestore query
-9. Deploy via existing GitHub Actions (push to main)
+9. Deploy manually: `gcloud run deploy coupon-dispatch --source . --region us-west1 --project juris-coupon-valid` from `dispatch/` (pushing to main does NOT deploy)
 10. Test end-to-end: use "Resend Confirmation Email" button in CIMcloud Worker Portal
     on a known OCWR order to trigger the Power Automate flow
 

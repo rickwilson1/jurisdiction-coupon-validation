@@ -49,9 +49,11 @@ Code pattern: `CITY[ABB]COM26` = compost, `CITY[ABB]CM26` = cover mulch
 
 ## Deployment
 
-- Cloud Run URL: `https://coupon-validator-751008504644.us-west1.run.app`
+- Cloud Run services (both in GCP project `juris-coupon-valid`, region `us-west1`):
+  - **Production** (live, called by CIMcloud): `https://coupon-validator-751008504644.us-west1.run.app`
+  - **Development** (dispatch build in progress): `https://coupon-dispatch-751008504644.us-west1.run.app`
 - Region: us-west1
-- CI/CD: GitHub Actions → Docker → Artifact Registry → Cloud Run (push to main)
+- Deploys: **manual**, not automated. Run `gcloud run deploy <service> --source . --region us-west1 --project juris-coupon-valid` from the service dir. Pushing to `main` does NOT deploy — the only GitHub Actions workflow (`update-cdtfa-data.yml`) just refreshes the CDTFA tax-district data on a schedule.
 - GCS bucket: `agromin-coupon-data` (coupons.xlsx, 5-min TTL cache)
 - Firestore collection: `order_events`
 - CDTFA shapefile: bundled in image at `CDTFA_TaxDistricts.gpkg` (26MB)

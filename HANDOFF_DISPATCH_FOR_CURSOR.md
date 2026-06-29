@@ -15,7 +15,13 @@
 
 Endpoints (do not change their contracts): `POST /api/ingest-order` (structured JSON), `POST /api/ingest-cimcloud-email` (raw email, the production path), `POST /api/generate-manifest` (delivery PDF), `GET /api/delivery-schedule` (last 7 days of deliveries), `GET /health`, `GET /`.
 
-Deployment: GCP project `juris-coupon-valid`, region `us-west1`, service URL `https://coupon-dispatch-751008504644.us-west1.run.app`. CI/CD is GitHub Actions on push to `main`: Docker build → Artifact Registry → Cloud Run. There is no separate deploy command; pushing to main deploys.
+Deployment: GCP project `juris-coupon-valid`, region `us-west1`, service URL `https://coupon-dispatch-751008504644.us-west1.run.app`. **Deploys are manual — there is no auto-deploy. Pushing to `main` does NOT deploy** (the only GitHub Actions workflow, `update-cdtfa-data.yml`, is an unrelated scheduled data updater, and `juris-coupon-valid` has no Cloud Build trigger). To ship a new revision, run from `dispatch/`:
+
+```bash
+gcloud run deploy coupon-dispatch --source . --region us-west1 --project juris-coupon-valid
+```
+
+This builds the image from `dispatch/Dockerfile` via Cloud Build, pushes to the `cloud-run-source-deploy` Artifact Registry repo, and rolls out a new revision. Existing env vars (`DISPATCH_API_KEY`, `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `MAIL_SENDER`, `OFELIA_EMAIL`) are preserved across a `--source` redeploy.
 
 ---
 
@@ -86,9 +92,9 @@ What has **not** been done: a local container build, the project's own test suit
 1. `git status` and `git diff` to see the full working-tree state. Do not assume HEAD is the baseline (Section 2).
 2. Confirm with Rick whether the prior uncommitted body of `main.py` matches what is currently running in Cloud Run, so you know whether you are deploying one change or a backlog of changes.
 3. Stage and commit in legible units. Suggested: one commit for the prior parser/Graph/master-sheet body if it is genuinely uncommitted, then one commit titled along the lines of "Capture order financials and comments; populate master-sheet money columns and coordinator alert" for the Section 3 edits.
-4. Build the container locally (or via the CI workflow on a branch) to confirm the four added dependencies install and the module imports.
-5. Smoke-test `POST /api/ingest-cimcloud-email` with the repo's `.eml` body before pushing to main.
-6. Push to `main` to deploy. Watch the GitHub Actions run and the Cloud Run revision come up healthy.
+4. Build the container locally (`docker build dispatch/`) or let the `gcloud run deploy --source .` Cloud Build step do it, to confirm the four added dependencies install and the module imports.
+5. Smoke-test `POST /api/ingest-cimcloud-email` with the repo's `.eml` body before deploying.
+6. Commit, then deploy manually with `gcloud run deploy coupon-dispatch --source . --region us-west1 --project juris-coupon-valid` (run from `dispatch/`). Pushing to `main` is for version control only and does not deploy. Confirm the new Cloud Run revision comes up healthy (`GET /` → 200).
 7. After deploy, run one real order end to end (CIMcloud "Resend Confirmation Email" on a known program order) and confirm Greg's sheet row carries the dollar values and the coordinator alert shows the comment line.
 
 ---
