@@ -13,3 +13,18 @@ coupons.xlsx
 .env
 .streamlit/
 !.streamlit/config.toml
+
+# Python virtual environments
+.venv/
+venv/
+
+# Raw email fixtures / exports — may contain customer PII
+*.eml
+
+# Coupon-program data exports — contain customer PII (names, emails, addresses)
+coupon_customers_*.csv
+coupon_orders_*.csv
+Sacramento_Coupon_Program_*.xlsx
+
+# Office data workbooks / exports (this repo treats spreadsheets as data, not source)
+*.xlsx
