@@ -39,13 +39,17 @@ All non-health endpoints require `X-API-Key` header matching
 
 ## Environment variables
 
+Email is sent via the Microsoft Graph API using app-only authentication
+(client-credentials flow). The app registration "Agromin Coupon Dispatch"
+is scoped via Exchange RBAC to send only as `dispatch@agromin.com`.
+
 | Variable | Required | Notes |
 |---|---|---|
 | `DISPATCH_API_KEY` | Yes | Auth secret shared with Power Automate |
-| `SMTP_USER` | For email | `dispatch@agromin.com` |
-| `SMTP_PASSWORD` | For email | Set via M365 admin |
-| `SMTP_HOST` | No | Defaults to `smtp.office365.com` |
-| `SMTP_PORT` | No | Defaults to `587` |
+| `GRAPH_TENANT_ID` | For email | Entra directory (tenant) ID |
+| `GRAPH_CLIENT_ID` | For email | App registration's application (client) ID |
+| `GRAPH_CLIENT_SECRET` | For email | Client secret value (rotate every 24 mo) |
+| `MAIL_SENDER` | No | Defaults to `dispatch@agromin.com` |
 | `OFELIA_EMAIL` | No | CC'd on customer emails |
 | `GREG_EMAIL` | No | OC delivery coordinator |
 | `BRIAN_EMAIL` | No | OC delivery coordinator |
@@ -53,7 +57,7 @@ All non-health endpoints require `X-API-Key` header matching
 | `CHRIS_EMAIL` | No | Ventura coordinator |
 | `ROSA_EMAIL` | No | Sacramento coordinator |
 
-If SMTP creds are unset, email sending is skipped with a warning log
+If Graph creds are unset, email sending is skipped with a warning log
 (useful for local development).
 
 ## Deploy
