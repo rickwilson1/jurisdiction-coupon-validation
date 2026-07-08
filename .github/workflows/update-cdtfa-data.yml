@@ -9,6 +9,11 @@ on:
     # Run every Monday at 9am UTC (1am PST)
     - cron: '0 9 * * 1'
   workflow_dispatch:  # Allow manual trigger
+    inputs:
+      force_deploy:
+        description: 'Deploy to Cloud Run even if the data has not changed'
+        type: boolean
+        default: false
 
 jobs:
   update-data:
@@ -44,6 +49,15 @@ jobs:
             echo "No existing file - will add"
           fi
 
+      - name: Determine whether to deploy
+        id: deploy_gate
+        run: |
+          if [ "${{ steps.check_changes.outputs.changed }}" == "true" ] || [ "${{ inputs.force_deploy }}" == "true" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update file if changed
         if: steps.check_changes.outputs.changed == 'true'
         run: |
@@ -66,18 +80,18 @@ jobs:
           git push
 
       - name: Authenticate to Google Cloud
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.deploy_gate.outputs.should_deploy == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/751008504644/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-deployer@juris-coupon-valid.iam.gserviceaccount.com
 
       - name: Set up Cloud SDK
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.deploy_gate.outputs.should_deploy == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.deploy_gate.outputs.should_deploy == 'true'
         run: |
           gcloud run deploy coupon-validator \
             --source . \
@@ -92,6 +106,8 @@ jobs:
         run: |
           if [ "${{ steps.check_changes.outputs.changed }}" == "true" ]; then
             echo "✅ CDTFA data updated and deployed to Cloud Run"
+          elif [ "${{ steps.deploy_gate.outputs.should_deploy }}" == "true" ]; then
+            echo "✅ No data change; forced redeploy to Cloud Run"
           else
             echo "ℹ️ No changes detected - skipped deployment"
           fi
