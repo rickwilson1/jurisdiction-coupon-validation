@@ -2,6 +2,7 @@ name: Update CDTFA Tax District Data
 
 permissions:
   contents: write
+  id-token: write
 
 on:
   schedule:
@@ -68,7 +69,8 @@ jobs:
         if: steps.check_changes.outputs.changed == 'true'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: projects/751008504644/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@juris-coupon-valid.iam.gserviceaccount.com
 
       - name: Set up Cloud SDK
         if: steps.check_changes.outputs.changed == 'true'
