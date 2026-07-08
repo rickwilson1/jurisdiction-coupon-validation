@@ -1,0 +1,4 @@
+# Development-only tools. NOT installed into the Cloud Run image
+# (that uses requirements.txt). Install locally with:
+#   .venv/bin/pip install -r requirements-dev.txt
+ruff==0.15.20

@@ -1,0 +1,12 @@
+{
+    "google.cloud.project": "juris-coupon-valid",
+    "google.cloud.billingQuotaProject": "juris-coupon-valid",
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    }
+}

@@ -1,0 +1,15 @@
+[tool.ruff]
+# Lint against the Cloud Run runtime, not the local venv (3.14)
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", "docs", "redirect"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import-sort, UP pyupgrade, B bugbear, C4 comprehensions
+select = ["E", "W", "F", "I", "UP", "B", "C4"]
+ignore = [
+    "E501",  # line length handled by the formatter, not worth blocking on
+]
+
+[tool.ruff.format]
+quote-style = "double"
