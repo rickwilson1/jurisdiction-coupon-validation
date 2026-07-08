@@ -1,5 +1,8 @@
 name: Update CDTFA Tax District Data
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # Run every Monday at 9am UTC (1am PST)
