@@ -23,7 +23,11 @@ esac
 "$RUFF" format "$FILE" >/dev/null 2>&1 || true
 
 # Re-check for anything the auto-fixer couldn't resolve on its own.
-OUT="$("$RUFF" check "$FILE" 2>&1)" && exit 0
+# Capture in an `if` condition: this is set -e-safe (conditions are exempt
+# from errexit) and unambiguously ties the clean-exit to ruff's status.
+if OUT="$("$RUFF" check "$FILE" 2>&1)"; then
+  exit 0
+fi
 
 # Remaining issues need a judgment call: report them to Claude.
 {
