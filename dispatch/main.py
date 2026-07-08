@@ -16,7 +16,7 @@ import os
 import quopri
 import re
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Optional
 from zoneinfo import ZoneInfo

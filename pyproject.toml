@@ -1,0 +1,9 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+# Ruff's default rule set: pyflakes (F) plus a curated subset of
+# pycodestyle errors (E). Kept conservative to avoid noisy failures;
+# expand `select` later (e.g. "I" for import sorting, "UP", "B") as desired.
+select = ["E4", "E7", "E9", "F"]

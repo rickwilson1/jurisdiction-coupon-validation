@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from shapely.geometry import Point
 import os
 import re
-import csv
 import logging
 from functools import lru_cache
 from datetime import datetime, date
@@ -718,12 +717,9 @@ async def upload_coupons(
         # Get file content - either from form upload or raw body
         if file and file.filename:
             content = await file.read()
-            filename = file.filename.lower()
         else:
             # Raw binary upload from Power Automate
             content = await request.body()
-            # Default to xlsx since that's what SharePoint sends
-            filename = "coupons.xlsx"
         
         if not content:
             raise HTTPException(status_code=400, detail="No file content received")
@@ -752,7 +748,7 @@ async def upload_coupons(
         
         return {
             "status": "success",
-            "message": f"Uploaded and processed coupon file",
+            "message": "Uploaded and processed coupon file",
             "coupons_loaded": len(coupons)
         }
         
