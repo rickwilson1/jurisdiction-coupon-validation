@@ -11,14 +11,14 @@ checkout. This service trusts that any order it receives via Power
 Automate is already a confirmed program order.
 """
 
+import html
 import logging
 import os
 import quopri
 import re
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 import msal
@@ -26,8 +26,8 @@ import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
 from google.cloud import firestore as firestore_client
+from pydantic import BaseModel
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -63,10 +63,88 @@ KENDALL_EMAIL = os.environ.get("KENDALL_EMAIL", "kendall@agromin.com")
 CHRIS_EMAIL = os.environ.get("CHRIS_EMAIL", "chris@agromin.com")
 ROSA_EMAIL = os.environ.get("ROSA_EMAIL", "rosa@agromin.com")
 
+# Internal staff who get a blind copy of every customer confirmation so they
+# can see exactly what the customer received. BCC rather than CC keeps Agromin
+# addresses off the customer-visible header. Set CONFIRMATION_BCC to a
+# comma-separated list to override; set it to an empty string to disable.
+_confirmation_bcc_env = os.environ.get("CONFIRMATION_BCC")
+if _confirmation_bcc_env is None:
+    CONFIRMATION_BCC = [e for e in [KENDALL_EMAIL] if e]
+else:
+    CONFIRMATION_BCC = [e.strip() for e in _confirmation_bcc_env.split(",") if e.strip()]
+
+SUPPORT_EMAIL = "sales@agromin.com"
+SUPPORT_PHONE = "(805) 485-9200"
+
+
+# ---------------------------------------------------
+# OCWR GREENERIES
+# Customer-facing pickup locations for the OC program.
+#
+# `map_url` values were verified by opening each PDF: the heading on the PDF
+# must name the same greenery as the block it appears under. The source Word
+# templates had these three URLs rotated by one position (Bee Canyon pointed at
+# the Olinda/Valencia map, Capistrano at the Bowerman/Bee Canyon map, Valencia
+# at the Prima/Capistrano map), which would have sent every pickup customer to
+# the wrong site map.
+# ---------------------------------------------------
+GREENERIES = [
+    {
+        "greenery": "Bee Canyon Greenery",
+        "landfill": "Frank R. Bowerman Landfill",
+        "yard_key": "Frank R. Bowerman",
+        "hours": "M-Sat | 8am - 4pm",
+        "address_lines": ["11002 Bee Canyon Access Rd.", "Irvine, CA 92602"],
+        "phone": "(949) 551-7100",
+        "map_url": (
+            "https://oclandfills.com/sites/ocwr/files/2025-10/"
+            "2025_10_25_FRANK%20R.%20BOWERMAN%20Map%20-%20Compost%20and%20Mulch-part-1.pdf"
+        ),
+    },
+    {
+        "greenery": "Capistrano Greenery",
+        "landfill": "Prima Deshecha Landfill",
+        "yard_key": "Prima Deshecha",
+        "hours": "M-Sat | 8am - 4pm",
+        "address_lines": ["32250 Avenida La Pata", "San Juan Capistrano, CA 92675"],
+        "phone": "(949) 728-3040",
+        "map_url": (
+            "https://oclandfills.com/sites/ocwr/files/2024-07/"
+            "2024_07_19_PRIMA%20Map%20-%20Compost%20and%20Mulch_0.pdf"
+        ),
+    },
+    {
+        "greenery": "Valencia Greenery",
+        "landfill": "Olinda Alpha Landfill",
+        "yard_key": "Olinda Alpha",
+        "hours": "M-Sat | 7am - 3pm",
+        "address_lines": ["1942 Valencia Avenue", "Brea, CA 92823"],
+        "phone": "(714) 993-7396",
+        "map_url": (
+            "https://oclandfills.com/sites/ocwr/files/2025-12/"
+            "Olinda%20New%20Compost%20%26%20Mulch%20Pick%20Up%20Area%20%284%29.pdf"
+        ),
+        "note": "(New Pick Up Area)",
+    },
+]
+
+PICKUP_APPOINTMENT_URL = (
+    "https://outlook.office365.com/book/"
+    "CompostMulchPickupAppointments@ocgov.onmicrosoft.com/"
+    "?ismsaljsauthenabled=true"
+)
+COMPOST_TIPS_URL = "https://oclandfills.com/compost-mulch/greeneries-compost-tips"
+
 
 # ---------------------------------------------------
 # YARD LOCATIONS
 # Matching uses case-insensitive substring search on match_keys.
+#
+# Only `name` and `region` are read at runtime: `name` identifies which yard the
+# customer picked at checkout, `region` routes the delivery alert. The address /
+# phone / hours here are NOT what customers see. GREENERIES below is the single
+# source of truth for customer-facing greenery details — edit it, not this, when
+# OCWR changes an address or its hours.
 # ---------------------------------------------------
 YARD_LOCATIONS = {
     "Frank R. Bowerman": {
@@ -132,7 +210,10 @@ def get_yard_for_order(shipping_method: str) -> dict:
     for yard_name, yard_info in YARD_LOCATIONS.items():
         for key in yard_info.get("match_keys", []):
             if key.lower() in sm_lower:
-                return {"name": yard_name, **{k: v for k, v in yard_info.items() if k != "match_keys"}}
+                return {
+                    "name": yard_name,
+                    **{k: v for k, v in yard_info.items() if k != "match_keys"},
+                }
     return {
         "name": "Agromin",
         "address": "Contact sales@agromin.com",
@@ -149,7 +230,15 @@ def infer_region_from_address(address: str) -> str:
     a = address.lower()
     if re.search(r"\bsacramento\b", a):
         return "sacramento"
-    ventura_cities = ["ventura", "oxnard", "camarillo", "fillmore", "ojai", "santa paula", "port hueneme"]
+    ventura_cities = [
+        "ventura",
+        "oxnard",
+        "camarillo",
+        "fillmore",
+        "ojai",
+        "santa paula",
+        "port hueneme",
+    ]
     if any(re.search(rf"\b{c}\b", a) for c in ventura_cities):
         return "ventura"
     return "oc"
@@ -161,6 +250,20 @@ def get_delivery_coordinator_emails(region: str) -> list:
     if region == "ventura":
         return [e for e in [CHRIS_EMAIL] if e]
     return [e for e in [GREG_EMAIL, BRIAN_EMAIL, KENDALL_EMAIL] if e]
+
+
+# Name used in the delivery email's "I am CC'ing ..." sentence. It has to track
+# whoever get_delivery_coordinator_emails() actually puts on the CC line, or a
+# Ventura customer is told Greg will call while Chris gets the order.
+DELIVERY_COORDINATOR_NAMES = {
+    "oc": "Greg Jackson",
+    "ventura": "Chris",
+    "sacramento": "Rosa",
+}
+
+
+def get_delivery_coordinator_name(region: str) -> str:
+    return DELIVERY_COORDINATOR_NAMES.get(region, DELIVERY_COORDINATOR_NAMES["oc"])
 
 
 def format_qty(qty: float) -> str:
@@ -289,11 +392,9 @@ def build_master_sheet_rows(order: "OrderPayload", routing: str) -> list:
 
     addr = parse_us_address(order.shipping_address)
     sales_order = strip_a_prefix(order.order_number)
-    today = datetime.now(timezone.utc).astimezone(_PACIFIC_TZ).date()
+    today = datetime.now(UTC).astimezone(_PACIFIC_TZ).date()
     today_short = f"{today.month}/{today.day}/{today.year % 100:02d}"
-    note = (
-        f"Auto-imported {today_short}. Origin TBD — Greg to assign yard."
-    )
+    note = f"Auto-imported {today_short}. Origin TBD — Greg to assign yard."
 
     # Delivery fee is charged once per order, not per line item. Prefer the
     # parsed Shipping total; fall back to a dollar amount embedded in the
@@ -323,31 +424,33 @@ def build_master_sheet_rows(order: "OrderPayload", routing: str) -> list:
 
         line_total = round(item.qty * item.unit_price, 2)
 
-        rows.append({
-            H["customer"]: order.customer_name,
-            H["status"]: "In Process",
-            H["date_of_request"]: today.isoformat(),
-            H["scheduled_delivery_date"]: "",
-            H["sales_order"]: sales_order,
-            H["phone"]: order.customer_phone,
-            H["email"]: order.customer_email,
-            H["delivery_address"]: addr["street"],
-            H["city"]: addr["city"],
-            H["state"]: addr["state"],
-            H["zip_code"]: addr["zip"],
-            H["origin_greenery"]: "",
-            H["origin_landfill"]: "",
-            H["material"]: material,
-            H["compost_qty"]: item.qty if material == "Compost" else "",
-            H["mulch_qty"]: item.qty if material == "Mulch" else "",
-            H["bags_qty"]: item.qty if material == "Bags" else "",
-            H["compost_total"]: line_total if material == "Compost" else "",
-            H["mulch_total"]: line_total if material == "Mulch" else "",
-            H["bags_total"]: line_total if material == "Bags" else "",
-            H["delivery_fee"]: delivery_fee if first_row else "",
-            H["total_no_tax"]: total_no_tax if first_row else "",
-            H["notes"]: note,
-        })
+        rows.append(
+            {
+                H["customer"]: order.customer_name,
+                H["status"]: "In Process",
+                H["date_of_request"]: today.isoformat(),
+                H["scheduled_delivery_date"]: "",
+                H["sales_order"]: sales_order,
+                H["phone"]: order.customer_phone,
+                H["email"]: order.customer_email,
+                H["delivery_address"]: addr["street"],
+                H["city"]: addr["city"],
+                H["state"]: addr["state"],
+                H["zip_code"]: addr["zip"],
+                H["origin_greenery"]: "",
+                H["origin_landfill"]: "",
+                H["material"]: material,
+                H["compost_qty"]: item.qty if material == "Compost" else "",
+                H["mulch_qty"]: item.qty if material == "Mulch" else "",
+                H["bags_qty"]: item.qty if material == "Bags" else "",
+                H["compost_total"]: line_total if material == "Compost" else "",
+                H["mulch_total"]: line_total if material == "Mulch" else "",
+                H["bags_total"]: line_total if material == "Bags" else "",
+                H["delivery_fee"]: delivery_fee if first_row else "",
+                H["total_no_tax"]: total_no_tax if first_row else "",
+                H["notes"]: note,
+            }
+        )
         first_row = False
 
     return rows
@@ -388,9 +491,7 @@ def _get_graph_token() -> str:
             client_credential=GRAPH_CLIENT_SECRET,
         )
 
-    result = _msal_app.acquire_token_for_client(
-        scopes=["https://graph.microsoft.com/.default"]
-    )
+    result = _msal_app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
 
     if "access_token" not in result:
         raise RuntimeError(
@@ -403,27 +504,41 @@ def _get_graph_token() -> str:
     return _token_cache["token"]
 
 
-def send_email(to: str, subject: str, body: str, cc: list = None):
-    """Send a plain-text email via Microsoft Graph as MAIL_SENDER (dispatch@agromin.com).
+def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    cc: list = None,
+    bcc: list = None,
+    html_body: str = None,
+) -> bool:
+    """Send an email via Microsoft Graph as MAIL_SENDER (dispatch@agromin.com).
 
-    Silently logs and returns if Graph credentials are not configured (useful for local dev).
+    Sends `html_body` as HTML when supplied so hyperlinks are clickable,
+    otherwise sends `body` as plain text. Returns True only when Graph accepts
+    the message so callers can log a real send result instead of assuming
+    success.
+
+    Returns False if Graph credentials are not configured (useful for local dev).
     """
     if not (GRAPH_TENANT_ID and GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET):
         logger.warning("Graph credentials not configured — email skipped (to=%s)", to)
-        return
+        return False
 
     try:
         token = _get_graph_token()
 
+        content_type, content = ("HTML", html_body) if html_body else ("Text", body)
+
         message = {
             "subject": subject,
-            "body": {"contentType": "Text", "content": body},
+            "body": {"contentType": content_type, "content": content},
             "toRecipients": [{"emailAddress": {"address": to}}],
         }
         if cc:
-            message["ccRecipients"] = [
-                {"emailAddress": {"address": c}} for c in cc
-            ]
+            message["ccRecipients"] = [{"emailAddress": {"address": c}} for c in cc]
+        if bcc:
+            message["bccRecipients"] = [{"emailAddress": {"address": b}} for b in bcc]
 
         url = f"https://graph.microsoft.com/v1.0/users/{MAIL_SENDER}/sendMail"
         resp = requests.post(
@@ -437,85 +552,420 @@ def send_email(to: str, subject: str, body: str, cc: list = None):
         )
 
         if resp.status_code in (200, 202):
-            logger.info("Email sent to %s subject: %s", to, subject)
-        else:
-            logger.error(
-                "Graph sendMail failed (status=%s) for to=%s: %s",
-                resp.status_code, to, resp.text,
+            logger.info(
+                "Email sent to=%s cc=%s bcc=%s subject=%s",
+                to,
+                cc or [],
+                bcc or [],
+                subject,
             )
+            return True
+
+        logger.error(
+            "Graph sendMail failed (status=%s) for to=%s: %s",
+            resp.status_code,
+            to,
+            resp.text,
+        )
+        return False
     except Exception as e:
         logger.error("Failed to send email to %s: %s", to, e)
+        return False
 
 
-SB1383_PARAGRAPH = (
-    "IMPORTANT — When you arrive: Look for the QR code sign near the material pickup area. "
-    "Scanning it takes less than a minute and helps OCWR stay in compliance with "
-    "California's SB 1383 organics diversion law. Thank you for participating."
+# ---------------------------------------------------
+# CUSTOMER EMAIL CONTENT
+#
+# Body copy is transcribed from Kendall's July 2026 Word templates:
+#   Email Template - UNDER 5 yards Coupon Order Instructions.docx
+#   Email Template- OVER 5 yards Coupon Order Instructions.docx
+#   Email Template- Delivery Request Receipt.docx
+#
+# These are sent as HTML because the copy relies on hyperlinks ("use this
+# LINK", "link to printable PDF map"). A plain-text send would strip the
+# anchors and leave the customer with unclickable words and no URL.
+# ---------------------------------------------------
+_BODY_STYLE = (
+    "font-family:Aptos,Calibri,'Segoe UI',Arial,sans-serif;"
+    "font-size:11pt;line-height:1.4;color:#1a1a1a;"
 )
 
-PICKUP_SELF_LOAD_TEMPLATE = """\
-Hello {customer_name},
+_BAGGED_UNIT_RE = re.compile(r"\b\d+\s*(?:cf|cu\.?\s*ft\.?|cubic\s+f(?:oo|ee)t)\b")
 
-Your order for {qty} cubic yards of {material} is ready for self-loading pickup.
 
-PICKUP INSTRUCTIONS:
-- Use the 5-gallon buckets provided at the site for measurement
-- Bring this email confirmation AND proof of address within the county
-  (valid photo ID or utility bill)
-- Available during site hours: {yard_hours}
+def _display_material(description: str) -> tuple[str, str]:
+    """Return (material name, singular unit) for customer-facing prose.
 
-Location: {yard_name}
-{yard_address}
-{yard_phone}
+    Deliberately separate from `classify_material`, which drives Greg's Master
+    Sheet columns and maps bagged compost to 'Compost'. Customer copy also
+    needs the unit: a "Organic Harvest Compost 1cf" order is counted in bags,
+    not cubic yards, and telling that customer "8 cubic yards" would overstate
+    the order by three orders of magnitude.
+    """
+    d = (description or "").lower()
 
-Order #: {order_number}
+    if "mulch" in d:
+        name = "mulch"
+    elif "compost" in d:
+        name = "compost"
+    else:
+        name = "material"
 
-{sb1383_note}
-Questions? Email sales@agromin.com or call (805) 485-9200.
+    if "pallet" in d:
+        unit = "pallet"
+    elif "bag" in d or _BAGGED_UNIT_RE.search(d):
+        unit = "bag"
+    else:
+        unit = "cubic yard"
+
+    return name, unit
+
+
+def _pluralize(unit: str, qty: float) -> str:
+    if qty == 1:
+        return unit
+    return "cubic yards" if unit == "cubic yard" else f"{unit}s"
+
+
+def describe_materials(order: "OrderPayload") -> str:
+    """Customer-facing quantity phrase, e.g. '3 cubic yards of compost'.
+
+    Groups line items by material and unit so a multi-material order reads
+    '3 cubic yards of compost and 2 cubic yards of mulch' rather than
+    attributing the combined quantity to whichever line item happened to be
+    first, which is what the previous single-material template did.
+    """
+    totals: dict[tuple[str, str], float] = {}
+    for item in order.line_items:
+        key = _display_material(item.description)
+        totals[key] = totals.get(key, 0.0) + item.qty
+
+    if not totals:
+        return "your requested material"
+
+    parts = [
+        f"{format_qty(qty)} {_pluralize(unit, qty)} of {name}"
+        for (name, unit), qty in totals.items()
+    ]
+
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def clean_display_address(addr: str) -> str:
+    """Trim CIMcloud shipping-address noise for customer-facing display.
+
+    CIMcloud prefixes the block with a recipient or company name and appends
+    ', USA', neither of which belongs in the sentence 'delivered to ...'.
+    """
+    parts = [p.strip() for p in (addr or "").split(",") if p.strip()]
+    if parts and parts[-1].upper().replace(".", "") in ("USA", "US", "UNITED STATES"):
+        parts.pop()
+    if len(parts) > 1 and not re.match(r"^\d", parts[0]) and re.match(r"^\d", parts[1]):
+        parts.pop(0)
+    return ", ".join(parts)
+
+
+def _greenery_block_html(selected_yard_key: str | None = None) -> str:
+    """Render the three OCWR greenery blocks, flagging the selected yard."""
+    blocks = []
+    for site in GREENERIES:
+        heading = html.escape(site["greenery"])
+        if site.get("note"):
+            heading += f" {html.escape(site['note'])}"
+        if selected_yard_key and site["yard_key"] == selected_yard_key:
+            heading += (
+                ' <span style="color:#1f6f3f;">&mdash; the location you selected at checkout</span>'
+            )
+        address = "<br>".join(html.escape(line) for line in site["address_lines"])
+        blocks.append(
+            f'<p style="margin:0 0 14px 0;"><strong>{heading}</strong><br>'
+            f"{html.escape(site['hours'])}<br>"
+            f"{address}<br>"
+            f"{html.escape(site['phone'])}<br>"
+            f'<a href="{site["map_url"]}">Link to printable PDF map</a> for '
+            f"{html.escape(site['greenery'])} at {html.escape(site['landfill'])}</p>"
+        )
+    return "".join(blocks)
+
+
+def _greenery_block_text(selected_yard_key: str | None = None) -> str:
+    lines = []
+    for site in GREENERIES:
+        heading = site["greenery"]
+        if site.get("note"):
+            heading += f" {site['note']}"
+        if selected_yard_key and site["yard_key"] == selected_yard_key:
+            heading += " — the location you selected at checkout"
+        lines.append(heading)
+        lines.append(site["hours"])
+        lines.extend(site["address_lines"])
+        lines.append(site["phone"])
+        lines.append(
+            f"Printable PDF map for {site['greenery']} at {site['landfill']}: {site['map_url']}"
+        )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _footer_html() -> str:
+    return (
+        f'<p style="margin:0 0 14px 0;">If you have any questions, reply to this '
+        f"email or call {SUPPORT_PHONE}.</p>"
+        f'<p style="margin:0;">Thank you,<br>Agromin</p>'
+    )
+
+
+def _footer_text() -> str:
+    return (
+        f"If you have any questions, reply to this email or call {SUPPORT_PHONE}.\n\n"
+        "Thank you,\nAgromin"
+    )
+
+
+def _order_reference_html(order: "OrderPayload", material_phrase: str | None = None) -> str:
+    """Order-number callout. Both pickup templates ask the customer to present
+    their order confirmation on arrival, so the number has to be easy to find.
+    """
+    detail = f"<br>{html.escape(material_phrase)}" if material_phrase else ""
+    return (
+        '<p style="margin:0 0 14px 0;padding:10px 12px;background:#f4f6f4;'
+        'border-left:3px solid #1f6f3f;">'
+        f"<strong>Order #{html.escape(order.order_number)}</strong>{detail}</p>"
+    )
+
+
+def build_pickup_self_load_email(order: "OrderPayload", yard: dict) -> tuple:
+    """Under 5 cubic yards: self-service pickup, scheduled via OCWR Bookings."""
+    material_phrase = describe_materials(order)
+    selected = yard.get("name")
+
+    html_body = f"""<html><body style="{_BODY_STYLE}">
+<p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
+{_order_reference_html(order, material_phrase)}
+<p style="margin:0 0 14px 0;">Thank you for participating in the Orange County Waste
+and Recycling&rsquo;s Free Compost and Mulch Program.</p>
+<p style="margin:0 0 14px 0;">Please review the following pick-up instructions for
+your material.</p>
+<p style="margin:0 0 14px 0;"><strong>Use this
+<a href="{PICKUP_APPOINTMENT_URL}">LINK</a> to schedule an appointment to pick up your
+compost/mulch</strong> - be sure to select the preferred service location (Valencia,
+Capistrano or Bee Canyon)</p>
+<p style="margin:0 0 14px 0;">You will receive email confirmation when you submit your
+request with instructions on when, where, and how to pick up your compost/mulch.</p>
+<p style="margin:0 0 14px 0;"><strong>Please note that for any order under 5 yards, the
+greeneries are self-service sites</strong> that require you to bring your own tools and
+containers to load your material (shovels, buckets, bags, etc.).</p>
+<p style="margin:0 0 14px 0;">There will be 5 gallon buckets available to help you load
+material into your own containers. Please leave these for the next customers.</p>
+<p style="margin:0 0 14px 0;">There will be a QR code at the self-serve sites for you to
+submit confirmation of your order fulfillment. This is extremely helpful as we track
+procurement for state mandated SB 1383 requirements.</p>
+<p style="margin:0 0 14px 0;">Please bring a copy of your email confirmation to verify
+residency.</p>
+<p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
+Tips</a> website for details on the difference between compost and mulch and for tips on
+composting.</p>
+{_greenery_block_html(selected)}
+{_footer_html()}
+</body></html>"""
+
+    text_body = f"""Hello {order.customer_name},
+
+Order #{order.order_number}
+{material_phrase}
+
+Thank you for participating in the Orange County Waste and Recycling's Free
+Compost and Mulch Program.
+
+Please review the following pick-up instructions for your material.
+
+Use this link to schedule an appointment to pick up your compost/mulch - be
+sure to select the preferred service location (Valencia, Capistrano or Bee
+Canyon):
+{PICKUP_APPOINTMENT_URL}
+
+You will receive email confirmation when you submit your request with
+instructions on when, where, and how to pick up your compost/mulch.
+
+Please note that for any order under 5 yards, the greeneries are self-service
+sites that require you to bring your own tools and containers to load your
+material (shovels, buckets, bags, etc.).
+
+There will be 5 gallon buckets available to help you load material into your
+own containers. Please leave these for the next customers.
+
+There will be a QR code at the self-serve sites for you to submit confirmation
+of your order fulfillment. This is extremely helpful as we track procurement
+for state mandated SB 1383 requirements.
+
+Please bring a copy of your email confirmation to verify residency.
+
+Visit Compost and Mulch Tips for details on the difference between compost and
+mulch and for tips on composting:
+{COMPOST_TIPS_URL}
+
+{_greenery_block_text(selected)}
+{_footer_text()}"""
+
+    subject = f"Your Agromin Order #{order.order_number} — Compost/Mulch Pick-Up Instructions"
+    return subject, text_body, html_body
+
+
+def build_pickup_staff_load_email(order: "OrderPayload", yard: dict) -> tuple:
+    """5 cubic yards and over: greenery crew loads with heavy equipment."""
+    material_phrase = describe_materials(order)
+    selected = yard.get("name")
+
+    html_body = f"""<html><body style="{_BODY_STYLE}">
+<p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
+{_order_reference_html(order, material_phrase)}
+<p style="margin:0 0 14px 0;">Thank you for participating in the OC Waste and
+Recycling&rsquo;s Free Compost and Mulch Program.</p>
+<p style="margin:0 0 14px 0;">Please review the following pick up instructions for your
+material:</p>
+<p style="margin:0 0 14px 0;"><strong>You must have a commercial truck or heavy-duty
+trailer</strong> in order for our greenery crew to assist with loading using heavy
+equipment.</p>
+<p style="margin:0 0 14px 0;">When you arrive at the landfill, check in at the fee booth
+and weigh in at the scales.</p>
+<p style="margin:0 0 14px 0;">You will be required to present your order confirmation and
+a <strong>valid photo I.D. to verify residency.</strong></p>
+<p style="margin:0 0 14px 0;">You will then be directed to the greenery.</p>
+<p style="margin:0 0 14px 0;">Please Note: We can only load commercial TRUCKS and
+TRAILERS with capacity for at least 5 cubic yards of bulk material. Trailers will require
+solid sides and floor or the customer will be required to provide their own tarps to
+prevent spilling during transport.</p>
+<p style="margin:0 0 14px 0;">NO CARS. NO MINIVANS. If you do not have a commercial truck
+or heavy duty trailer, you will be redirected to the public self-haul area to
+self-load.</p>
+<p style="margin:0 0 14px 0;">NO SELF-LOADING at the greenery.</p>
+<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers 150 Sq.
+Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1 &frac12;
+Cubic Yards of Compost per load.</p>
+<p style="margin:0 0 14px 0;">You must weigh out at the scales before leaving the
+site.</p>
+<p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
+Tips</a> website for details on the difference between compost and mulch and for tips on
+composting.</p>
+{_greenery_block_html(selected)}
+{_footer_html()}
+</body></html>"""
+
+    text_body = f"""Hello {order.customer_name},
+
+Order #{order.order_number}
+{material_phrase}
+
+Thank you for participating in the OC Waste and Recycling's Free Compost and
+Mulch Program.
+
+Please review the following pick up instructions for your material:
+
+You must have a commercial truck or heavy-duty trailer in order for our
+greenery crew to assist with loading using heavy equipment.
+
+When you arrive at the landfill, check in at the fee booth and weigh in at the
+scales.
+
+You will be required to present your order confirmation and a valid photo I.D.
+to verify residency.
+
+You will then be directed to the greenery.
+
+Please Note: We can only load commercial TRUCKS and TRAILERS with capacity for
+at least 5 cubic yards of bulk material. Trailers will require solid sides and
+floor or the customer will be required to provide their own tarps to prevent
+spilling during transport.
+
+NO CARS. NO MINIVANS. If you do not have a commercial truck or heavy duty
+trailer, you will be redirected to the public self-haul area to self-load.
+
+NO SELF-LOADING at the greenery.
+
+For your reference, 1 Cubic Yard of Compost covers 150 Sq. Feet at 3"
+Layer/Depth. Most mid-sized pick-up trucks can hold 1/2 - 1 1/2 Cubic Yards of
+Compost per load.
+
+You must weigh out at the scales before leaving the site.
+
+Visit Compost and Mulch Tips for details on the difference between compost and
+mulch and for tips on composting:
+{COMPOST_TIPS_URL}
+
+{_greenery_block_text(selected)}
+{_footer_text()}"""
+
+    subject = f"Your Agromin Order #{order.order_number} — Compost/Mulch Pick Up Instructions"
+    return subject, text_body, html_body
+
+
+def build_delivery_email(order: "OrderPayload", coordinator_name: str = "Greg Jackson") -> tuple:
+    """Delivery request receipt. The named coordinator is CC'd, as the copy says."""
+    material_phrase = describe_materials(order)
+    address = clean_display_address(order.shipping_address)
+
+    # The bold sentence in Kendall's template names the quantity, material and
+    # delivery address. All three parse out of the CIMcloud order, so the
+    # sentence is populated rather than dropped. If the address is somehow
+    # missing, fall back to a generic sentence instead of emailing a customer
+    # "delivered to ''".
+    if address:
+        request_html = (
+            f"Your request for <strong>{html.escape(material_phrase)}</strong> to be "
+            f"delivered to <strong>{html.escape(address)}</strong> has been received."
+        )
+        request_text = (
+            f"Your request for {material_phrase} to be delivered to {address} has been received."
+        )
+    else:
+        request_html = (
+            f"Your request for <strong>{html.escape(material_phrase)}</strong> has been received."
+        )
+        request_text = f"Your request for {material_phrase} has been received."
+
+    html_body = f"""<html><body style="{_BODY_STYLE}">
+<p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
+{_order_reference_html(order)}
+<p style="margin:0 0 14px 0;">{request_html}</p>
+<p style="margin:0 0 14px 0;">Please note that, due to the coordination required for
+hauling and scheduling, it may take <strong>1&ndash;2 weeks</strong> before a delivery
+date is available.</p>
+<p style="margin:0 0 14px 0;"><strong>{html.escape(coordinator_name)}</strong> is copied on
+this email and will follow up with you directly to provide a hauling quote along with a
+proposed delivery date and time.</p>
+<p style="margin:0 0 14px 0;">For your reference, a cubic yard is 27 cubic feet, which
+covers about 108 square feet at 3 inches.</p>
+<p style="margin:0 0 14px 0;">If you have any updates or questions in the meantime, feel
+free to reply to this email.</p>
+<p style="margin:0;">Thank you,<br>Agromin</p>
+</body></html>"""
+
+    text_body = f"""Hello {order.customer_name},
+
+Order #{order.order_number}
+
+{request_text}
+
+Please note that, due to the coordination required for hauling and scheduling,
+it may take 1-2 weeks before a delivery date is available.
+
+{coordinator_name} is copied on this email and will follow up with you directly
+to provide a hauling quote along with a proposed delivery date and time.
+
+For your reference, a cubic yard is 27 cubic feet, which covers about 108 square
+feet at 3 inches.
+
+If you have any updates or questions in the meantime, feel free to reply to
+this email.
 
 Thank you,
 Agromin"""
 
-PICKUP_STAFF_LOAD_TEMPLATE = """\
-Hello {customer_name},
+    subject = f"Your Agromin Delivery Request #{order.order_number} — Received"
+    return subject, text_body, html_body
 
-Your order for {qty} cubic yards of {material} is ready for pickup.
-OCWR staff will load your vehicle using heavy equipment.
-
-PICKUP INSTRUCTIONS:
-- YOU MUST BRING A TRUCK OR TRAILER — cars and minivans cannot be loaded
-- Trailers must have solid sides/floor or customer must provide tarps
-- Bring this email confirmation AND proof of address within the county
-  (valid photo ID or utility bill)
-- Available during site hours: {yard_hours}
-
-Location: {yard_name}
-{yard_address}
-{yard_phone}
-
-Order #: {order_number}
-
-Questions? Email sales@agromin.com or call (805) 485-9200.
-
-Thank you,
-Agromin"""
-
-DELIVERY_TEMPLATE = """\
-Hello {customer_name},
-
-Thank you for your order. An Agromin representative will contact you within
-1 business day to schedule your delivery.
-
-Order #: {order_number}
-Material: {qty} cubic yards of {material}
-Delivery Address: {shipping_address}
-
-Please note: delivery fees apply separately and will be collected at time of delivery.
-
-Questions? Email sales@agromin.com or call (805) 485-9200.
-
-Thank you,
-Agromin"""
 
 DELIVERY_ALERT_TEMPLATE = """\
 New delivery order received — action required.
@@ -569,8 +1019,9 @@ class RawCimcloudEmail(BaseModel):
     Power Automate forwards the email body as HTML; we accept either decoded
     HTML or quoted-printable bytes (the parser auto-detects).
     """
+
     body: str
-    subject: Optional[str] = None
+    subject: str | None = None
 
 
 # ---------------------------------------------------
@@ -585,15 +1036,13 @@ class CimcloudParseError(ValueError):
 def _maybe_decode_quoted_printable(body: str) -> str:
     if re.search(r"=\r?\n", body) or "=3D" in body or "=3d" in body:
         try:
-            return quopri.decodestring(body.encode("latin-1")).decode(
-                "utf-8", errors="replace"
-            )
+            return quopri.decodestring(body.encode("latin-1")).decode("utf-8", errors="replace")
         except Exception:
             return body
     return body
 
 
-def _value_after_label(soup: BeautifulSoup, label: str) -> Optional[str]:
+def _value_after_label(soup: BeautifulSoup, label: str) -> str | None:
     """Find a <td>/<th> whose stripped text equals `label`; return next sibling cell text."""
     for cell in soup.find_all(["td", "th"]):
         if cell.get_text(strip=True) == label:
@@ -608,7 +1057,7 @@ def _parse_money(text: str) -> float:
     return float(cleaned) if cleaned else 0.0
 
 
-def _parse_qty(text: str) -> Optional[float]:
+def _parse_qty(text: str) -> float | None:
     try:
         return float((text or "").strip())
     except (ValueError, TypeError):
@@ -628,9 +1077,7 @@ def _parse_line_items(soup: BeautifulSoup) -> list[LineItem]:
             continue
         header_text = rows[0].get_text(separator=" ", strip=True)
         if not (
-            "Qty" in header_text
-            and "Description" in header_text
-            and "Unit Price" in header_text
+            "Qty" in header_text and "Description" in header_text and "Unit Price" in header_text
         ):
             continue
 
@@ -643,9 +1090,11 @@ def _parse_line_items(soup: BeautifulSoup) -> list[LineItem]:
                 continue
             desc_cell = cells[2]
             strong = desc_cell.find("strong")
-            description = strong.get_text(strip=True) if strong else desc_cell.get_text(
-                strip=True
-            ).split("SKU:")[0].strip()
+            description = (
+                strong.get_text(strip=True)
+                if strong
+                else desc_cell.get_text(strip=True).split("SKU:")[0].strip()
+            )
             sku_match = re.search(r"SKU:\s*(\S+)", desc_cell.get_text())
             sku = sku_match.group(1) if sku_match else ""
             unit_price = _parse_money(cells[3].get_text(strip=True))
@@ -710,9 +1159,7 @@ def _parse_order_comments(soup: BeautifulSoup) -> str:
             and any("shipping method" in h.lower() for h in header_texts)
         ):
             continue
-        comment_idx = next(
-            i for i, h in enumerate(header_texts) if "order comment" in h.lower()
-        )
+        comment_idx = next(i for i, h in enumerate(header_texts) if "order comment" in h.lower())
         for body_row in rows[1:]:
             cells = body_row.find_all(["td", "th"])
             if len(cells) > comment_idx:
@@ -733,9 +1180,7 @@ def parse_cimcloud_email(html_body: str) -> OrderPayload:
 
     full_text = soup.get_text(separator="\n")
     if "Coupon Code:" not in full_text:
-        raise CimcloudParseError(
-            "Email body has no 'Coupon Code:' field — not a program order"
-        )
+        raise CimcloudParseError("Email body has no 'Coupon Code:' field — not a program order")
 
     m = re.search(r"Your order number is\s+([A-Z0-9\-]+)\s*\.", full_text)
     if not m:
@@ -759,9 +1204,7 @@ def parse_cimcloud_email(html_body: str) -> OrderPayload:
     billing_td = mailto.find_parent("td") if mailto else None
     if billing_td is not None:
         raw_lines = [
-            ln.strip()
-            for ln in billing_td.get_text(separator="\n").split("\n")
-            if ln.strip()
+            ln.strip() for ln in billing_td.get_text(separator="\n").split("\n") if ln.strip()
         ]
         seen: list[str] = []
         for ln in raw_lines:
@@ -794,9 +1237,7 @@ def parse_cimcloud_email(html_body: str) -> OrderPayload:
             addr_td = method_td.find_previous_sibling("td")
             if addr_td is not None:
                 addr_lines = [
-                    ln.strip()
-                    for ln in addr_td.get_text(separator="\n").split("\n")
-                    if ln.strip()
+                    ln.strip() for ln in addr_td.get_text(separator="\n").split("\n") if ln.strip()
                 ]
                 shipping_address = ", ".join(addr_lines)
 
@@ -872,37 +1313,49 @@ def _process_order(order: OrderPayload) -> dict:
 
     try:
         db = get_firestore()
-        db.collection("order_events").document(order.order_number).set({
-            "order_number": order.order_number,
-            "processed_at": datetime.utcnow(),
-            "coupon_code": coupon_code,
-            "routing": routing,
-            "region": region,
-            "customer_name": order.customer_name,
-            "customer_email": order.customer_email,
-            "shipping_method": order.shipping_method,
-            "shipping_address": order.shipping_address,
-            "total_qty": total_qty,
-            "material": material,
-            "order_date": order.order_date,
-            "customer_phone": order.customer_phone,
-            "status": "success",
-        })
+        db.collection("order_events").document(order.order_number).set(
+            {
+                "order_number": order.order_number,
+                "processed_at": datetime.utcnow(),
+                "coupon_code": coupon_code,
+                "routing": routing,
+                "region": region,
+                "customer_name": order.customer_name,
+                "customer_email": order.customer_email,
+                "shipping_method": order.shipping_method,
+                "shipping_address": order.shipping_address,
+                "total_qty": total_qty,
+                "material": material,
+                "order_date": order.order_date,
+                "customer_phone": order.customer_phone,
+                "status": "success",
+            }
+        )
     except Exception as e:
         logger.error("Firestore write failed for order %s: %s", order.order_number, e)
 
     cc_list = [OFELIA_EMAIL] if OFELIA_EMAIL else []
 
     if routing == "delivery":
-        body = DELIVERY_TEMPLATE.format(
-            order_number=order.order_number,
-            customer_name=order.customer_name,
-            qty=qty_str,
-            material=material,
-            shipping_address=order.shipping_address,
+        # Kendall's delivery copy tells the customer "I am CC'ing Greg Jackson",
+        # so Greg has to be a real CC on this message, not only a recipient of
+        # the separate internal alert below.
+        coordinators = get_delivery_coordinator_emails(region)
+        primary_coordinator = coordinators[0] if coordinators else None
+        if primary_coordinator and primary_coordinator not in cc_list:
+            cc_list = cc_list + [primary_coordinator]
+
+        subject, text_body, html_body = build_delivery_email(
+            order, coordinator_name=get_delivery_coordinator_name(region)
         )
-        subject = f"Your Agromin Order #{order.order_number} — Delivery Confirmation"
-        send_email(order.customer_email, subject, body, cc=cc_list)
+        customer_email_sent = send_email(
+            order.customer_email,
+            subject,
+            text_body,
+            cc=cc_list,
+            bcc=CONFIRMATION_BCC,
+            html_body=html_body,
+        )
 
         alert_body = DELIVERY_ALERT_TEMPLATE.format(
             order_number=order.order_number,
@@ -917,27 +1370,36 @@ def _process_order(order: OrderPayload) -> dict:
             order_comments=order.order_comments or "(none)",
         )
         alert_subject = f"New Delivery Order #{order.order_number} — Action Required"
-        for coordinator in get_delivery_coordinator_emails(region):
+        for coordinator in coordinators:
             send_email(coordinator, alert_subject, alert_body)
     else:
         yard = get_yard_for_order(order.shipping_method)
-        common_fields = dict(
-            order_number=order.order_number,
-            customer_name=order.customer_name,
-            qty=qty_str,
-            material=material,
-            yard_name=yard["name"],
-            yard_address=yard["address"],
-            yard_phone=yard["phone"],
-            yard_hours=yard["hours"],
-        )
         if routing == "pickup_self_load":
-            sb1383 = SB1383_PARAGRAPH + "\n" if yard.get("qr_url") else ""
-            body = PICKUP_SELF_LOAD_TEMPLATE.format(sb1383_note=sb1383, **common_fields)
+            subject, text_body, html_body = build_pickup_self_load_email(order, yard)
         else:
-            body = PICKUP_STAFF_LOAD_TEMPLATE.format(**common_fields)
-        subject = f"Your Agromin Order #{order.order_number} — Pickup Instructions"
-        send_email(order.customer_email, subject, body, cc=cc_list)
+            subject, text_body, html_body = build_pickup_staff_load_email(order, yard)
+        customer_email_sent = send_email(
+            order.customer_email,
+            subject,
+            text_body,
+            cc=cc_list,
+            bcc=CONFIRMATION_BCC,
+            html_body=html_body,
+        )
+
+    # Record whether the customer email actually left the building. Without this
+    # a Graph rejection is invisible after the fact and "I never got the email"
+    # cannot be answered from the order record.
+    try:
+        get_firestore().collection("order_events").document(order.order_number).update(
+            {
+                "customer_email_sent": customer_email_sent,
+                "customer_email_cc": cc_list,
+                "customer_email_bcc": CONFIRMATION_BCC,
+            }
+        )
+    except Exception as e:
+        logger.error("Firestore email-status update failed for order %s: %s", order.order_number, e)
 
     master_sheet_rows = build_master_sheet_rows(order, routing)
 
@@ -947,6 +1409,7 @@ def _process_order(order: OrderPayload) -> dict:
         "routing": routing,
         "region": region,
         "total_qty": total_qty,
+        "customer_email_sent": customer_email_sent,
         "master_sheet_rows": master_sheet_rows,
     }
 
@@ -982,7 +1445,7 @@ async def ingest_order(
 async def ingest_cimcloud_email(
     request: Request,
     x_api_key: str = Header(None, alias="X-API-Key"),
-    x_email_subject: Optional[str] = Header(None, alias="X-Email-Subject"),
+    x_email_subject: str | None = Header(None, alias="X-Email-Subject"),
 ):
     if x_api_key != DISPATCH_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -1057,12 +1520,16 @@ async def generate_manifest(
     generated_at = datetime.utcnow().strftime("%B %d, %Y %I:%M %p UTC")
     info_data = [["Order #:", order.order_number, "Generated:", generated_at]]
     info_table = Table(info_data, colWidths=[1.1 * inch, 2.5 * inch, 1.1 * inch, 2.3 * inch])
-    info_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
     story.append(info_table)
     story.append(Spacer(1, 0.2 * inch))
 
@@ -1076,12 +1543,16 @@ async def generate_manifest(
         ["Delivery Address:", order.shipping_address],
     ]
     customer_table = Table(customer_data, colWidths=[1.5 * inch, 5.5 * inch])
-    customer_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+    customer_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
     story.append(customer_table)
     story.append(Spacer(1, 0.2 * inch))
 
@@ -1095,11 +1566,15 @@ async def generate_manifest(
         ["Coupon Code:", coupon_code],
     ]
     order_table = Table(order_data, colWidths=[1.5 * inch, 5.5 * inch])
-    order_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    order_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(order_table)
     story.append(Spacer(1, 0.5 * inch))
 
@@ -1113,13 +1588,17 @@ async def generate_manifest(
         ["OCWR Staff Signature\nupon material pickup:", "_" * 40, "Date:", "_" * 15],
     ]
     sig_table = Table(sig_data, colWidths=[1.8 * inch, 2.8 * inch, 0.6 * inch, 1.8 * inch])
-    sig_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
-    ]))
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ]
+        )
+    )
     story.append(sig_table)
 
     doc.build(story)
@@ -1151,18 +1630,22 @@ async def delivery_schedule(
             processed_at = data.get("processed_at")
             if processed_at and hasattr(processed_at, "replace"):
                 if processed_at.replace(tzinfo=None) >= cutoff:
-                    orders.append({
-                        "order_number": data.get("order_number"),
-                        "order_date": data.get("order_date"),
-                        "processed_at": processed_at.isoformat() if hasattr(processed_at, "isoformat") else str(processed_at),
-                        "customer_name": data.get("customer_name"),
-                        "customer_phone": data.get("customer_phone"),
-                        "shipping_address": data.get("shipping_address"),
-                        "material": data.get("material"),
-                        "total_qty": data.get("total_qty"),
-                        "region": data.get("region"),
-                        "coupon_code": data.get("coupon_code"),
-                    })
+                    orders.append(
+                        {
+                            "order_number": data.get("order_number"),
+                            "order_date": data.get("order_date"),
+                            "processed_at": processed_at.isoformat()
+                            if hasattr(processed_at, "isoformat")
+                            else str(processed_at),
+                            "customer_name": data.get("customer_name"),
+                            "customer_phone": data.get("customer_phone"),
+                            "shipping_address": data.get("shipping_address"),
+                            "material": data.get("material"),
+                            "total_qty": data.get("total_qty"),
+                            "region": data.get("region"),
+                            "coupon_code": data.get("coupon_code"),
+                        }
+                    )
         orders.sort(key=lambda x: x.get("processed_at", ""), reverse=True)
         return {"status": "ok", "count": len(orders), "orders": orders}
     except Exception as e:

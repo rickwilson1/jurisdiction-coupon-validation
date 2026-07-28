@@ -5,16 +5,19 @@
 
 ## Still Open (2 items blocking build)
 
-### OPEN — SMTP password
-`dispatch@agromin.com` mailbox exists and SMTP auth is enabled (confirmed via `Get-CASMailbox`). Superadmin still needs to run the password-set PowerShell commands and confirm.
+### SUPERSEDED — SMTP password
+No longer applicable. The dispatch service authenticates to Microsoft Graph with app-only
+credentials, so no `dispatch@agromin.com` mailbox password is used anywhere in the pipeline.
+The value that previously appeared below has been redacted and must be treated as compromised,
+because it was committed to a public repository on 2026-04-26.
 
-Superadmin commands:
+Commands originally sent to Converged:
 ```powershell
 # Step 1 — Connect to Microsoft Online (sign in with admin credentials when prompted)
 Connect-MsolService
 
 # Step 2 — Set the password on the dispatch@agromin.com shared mailbox
-Set-MsolUserPassword -UserPrincipalName dispatch@agromin.com -NewPassword "AI4Organics$" -ForceChangePassword $false
+Set-MsolUserPassword -UserPrincipalName dispatch@agromin.com -NewPassword "<REDACTED>" -ForceChangePassword $false
 
 # Step 3 — Verify the account (send screenshot of output)
 Get-MsolUser -UserPrincipalName dispatch@agromin.com | Select DisplayName, UserPrincipalName, StrongPasswordRequired
@@ -78,8 +81,8 @@ Kendall monitors. **Not yet deployed at yards.**
 
 | Variable | Value |
 |---|---|
-| `SMTP_USER` | `dispatch@agromin.com` |
-| `SMTP_PASSWORD` | `AI4Organics$` (pending superadmin password-set step) |
+| `SMTP_USER` | *(superseded, no SMTP auth in the deployed service)* |
+| `SMTP_PASSWORD` | *(superseded, redacted; service uses Graph app-only credentials)* |
 | `OFELIA_EMAIL` | `ofelia.velarde-garcia@ocwr.ocgov.com` |
 | `GREG_EMAIL` | `greg@agromin.com` |
 | `BRIAN_EMAIL` | `brian@agromin.com` |
@@ -102,4 +105,31 @@ Aqua-Flo Ojai and Agromin Oxnard (from original spec) are NOT the correct Ventur
 
 ---
 
-*Last updated: April 25, 2026*
+---
+
+## Phase 1 fragility note (added 2026-05-01)
+
+Phase 1 currently makes Greg's `OCWR-Agromin Deliveries.xlsx` Master Sheet the system of record. Power Automate writes new rows into `Table1` via the Excel Online connector. This works but is **fragile to normal Excel user behavior**:
+
+| If Greg... | Phase 1 breaks how? |
+|---|---|
+| Renames the workbook | PA can't find the file → orders silently fail to write |
+| Moves it to a different SharePoint folder | Same — PA's file ID is path-based |
+| Renames `Table1` | "Add a row to a table" fails — table name is hard-coded |
+| Deletes a column or renames a header | PA write fails with "column not found" |
+| Adds a new column or reorders columns | OK — PA binds by header name |
+| Downloads, edits in desktop Excel, re-uploads | SharePoint may issue a new file ID → PA breaks |
+
+### Interim mitigation (until Phase 2 ships the web app)
+
+1. Tell Greg explicitly: **"Don't rename the file, don't rename `Table1`, don't change column headers. Tell me first if you need to."**
+2. Optional: add a SharePoint version-history alert so we catch breakage fast.
+3. Treat this as a known fragility we accept in exchange for Phase 1's fast time-to-value.
+
+### Permanent fix (Phase 2)
+
+The Phase 2 design principle (see `SESSION_HANDOFF_2026-04-30.md` §17) flips the polarity: web app database becomes the system of record, spreadsheets become disposable read-only exports the app produces. Once Phase 2 ships, Excel-edit fragility goes away.
+
+---
+
+*Last updated: May 1, 2026*

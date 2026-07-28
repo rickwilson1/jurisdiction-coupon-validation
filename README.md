@@ -17,9 +17,10 @@ of full order routing, email dispatch, manifest generation, and delivery schedul
 **Dispatch (new — April 2026)**
 - Ingests order payloads from Power Automate (triggered by CIMcloud confirmation email).
 - Routes orders: pickup vs. delivery, qty threshold (<5 yds self-load / ≥5 yds staff-load).
-- Sends correct email template to customer via M365 SMTP relay from sales@agromin.com.
-- CCs ofelia@agromin.com on every order email.
-- Alerts greg@agromin.com on delivery orders; writes row to SharePoint delivery log.
+- Sends correct email template to customer via Microsoft Graph from dispatch@agromin.com.
+- CCs ofelia.velarde-garcia@ocwr.ocgov.com and BCCs kendall@agromin.com on every order email.
+- Alerts greg@agromin.com, brian@ and kendall@ on delivery orders, and CCs Greg on the
+  customer's delivery email; writes row to SharePoint delivery log.
 - Generates PDF manifest for delivery haulers (reportlab).
 - Logs every processed order to Firestore collection `order_events`.
 - Compiles and sends weekly delivery schedule to Ofelia (Cloud Scheduler, Friday 4pm).

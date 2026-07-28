@@ -31,7 +31,7 @@
    ```
    SMTP_USER=sales@agromin.com
    SMTP_PASSWORD=<M365 app password>
-   OFELIA_EMAIL=ofelia@agromin.com
+   OFELIA_EMAIL=ofelia.velarde-garcia@ocwr.ocgov.com
    GREG_EMAIL=greg@agromin.com
    ```
 

@@ -28,3 +28,7 @@ Sacramento_Coupon_Program_*.xlsx
 
 # Office data workbooks / exports (this repo treats spreadsheets as data, not source)
 *.xlsx
+
+# Credential-reset runbooks, contain privileged admin commands and must stay local
+dispatch_password_reset.md
+dispatch_password_reset.txt

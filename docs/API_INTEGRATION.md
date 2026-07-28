@@ -217,8 +217,10 @@ dispatches emails, writes Firestore log, and returns routing decision.
    - `qty < 5` → self-loading template
    - `qty >= 5` → staff-loaded template
 4. Write order to Firestore `order_events` (doc ID = order_number)
-5. Send customer email via SMTP (M365 relay, from sales@agromin.com, CC ofelia@agromin.com)
-6. Delivery path only: send alert to greg@agromin.com
+5. Send customer email via Microsoft Graph (from dispatch@agromin.com,
+   CC ofelia.velarde-garcia@ocwr.ocgov.com, BCC kendall@agromin.com)
+6. Delivery path only: CC greg@agromin.com on the customer email and send a
+   separate alert to greg@, brian@ and kendall@
 
 **Response:**
 
@@ -345,25 +347,28 @@ COUPONS_BUCKET=agromin-coupon-data
 UPLOAD_API_KEY=
 ```
 
-**New (add in Cloud Run console):**
+**Email (set on the `coupon-dispatch` Cloud Run service):**
 ```
-SMTP_USER=sales@agromin.com
-SMTP_PASSWORD=<M365 app password for sales@agromin.com>
-OFELIA_EMAIL=ofelia@agromin.com
-GREG_EMAIL=greg@agromin.com
+GRAPH_TENANT_ID=<Entra directory (tenant) ID>
+GRAPH_CLIENT_ID=<app registration application (client) ID>
+GRAPH_CLIENT_SECRET=<Secret Manager reference, not a literal>
+MAIL_SENDER=dispatch@agromin.com
+OFELIA_EMAIL=ofelia.velarde-garcia@ocwr.ocgov.com
 ```
 
-**M365 SMTP setup (no Azure app registration required):**
-1. M365 Admin Center → Users → sales@agromin.com → Mail → Manage email apps
-2. Enable: Authenticated SMTP
-3. Generate app password if MFA is enabled on the account
-4. Store password in GCP Secret Manager, reference as env var in Cloud Run
+`GREG_EMAIL`, `BRIAN_EMAIL`, `KENDALL_EMAIL` and `CONFIRMATION_BCC` are
+intentionally left unset and fall back to the defaults in `dispatch/main.py`.
 
-**SMTP relay settings:**
-- Host: `smtp.office365.com`
-- Port: `587`
-- Encryption: STARTTLS
-- Auth: SMTP_USER + SMTP_PASSWORD
+**Microsoft Graph setup (replaces the earlier SMTP relay approach):**
+1. Azure app registration "Agromin Coupon Dispatch" with the `Mail.Send`
+   application permission, admin-consented.
+2. Exchange RBAC application access policy scoping that app to send only as
+   `dispatch@agromin.com`, so a leaked secret cannot send as any other mailbox.
+3. Client secret stored in GCP Secret Manager and referenced as an env var.
+   Rotate every 24 months.
+
+Sending uses `POST /v1.0/users/{MAIL_SENDER}/sendMail` with the
+client-credentials flow. No SMTP credentials or app passwords are involved.
 
 ---
 

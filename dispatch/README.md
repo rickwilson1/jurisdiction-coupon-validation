@@ -51,14 +51,37 @@ is scoped via Exchange RBAC to send only as `dispatch@agromin.com`.
 | `GRAPH_CLIENT_SECRET` | For email | Client secret value (rotate every 24 mo) |
 | `MAIL_SENDER` | No | Defaults to `dispatch@agromin.com` |
 | `OFELIA_EMAIL` | No | CC'd on customer emails |
-| `GREG_EMAIL` | No | OC delivery coordinator |
+| `GREG_EMAIL` | No | OC delivery coordinator; also CC'd on delivery confirmations |
 | `BRIAN_EMAIL` | No | OC delivery coordinator |
 | `KENDALL_EMAIL` | No | OCWR side, monitors QR logs |
 | `CHRIS_EMAIL` | No | Ventura coordinator |
 | `ROSA_EMAIL` | No | Sacramento coordinator |
+| `CONFIRMATION_BCC` | No | Comma-separated internal BCC on every customer confirmation. Defaults to `KENDALL_EMAIL`. Set to an empty string to disable. |
 
 If Graph creds are unset, email sending is skipped with a warning log
 (useful for local development).
+
+## Customer email content
+
+Customer emails are sent as HTML because the approved copy depends on
+hyperlinks (the OCWR Bookings appointment link, the compost tips page, and a
+printable site map per greenery). A plain-text alternative is built alongside
+every HTML body and is what gets sent if HTML is ever disabled.
+
+Body copy is transcribed from Kendall's Word templates, with her July 28
+revisions applied: greenery hours are M-Sat (not M-F), the Valencia address
+omits the "N." so it points at the greenery rather than the landfill gate, and
+the delivery receipt states the cubic-yard conversion in text instead of
+embedding the truck-bed graphic.
+
+`GREENERIES` is the single source of truth for customer-facing greenery details.
+`YARD_LOCATIONS` is only consulted for yard-name matching and delivery-alert
+region routing; its address, phone and hours fields are not sent to customers.
+
+The three greenery site-map URLs were verified by opening each PDF and
+confirming the heading names the same greenery as the block it sits under. The
+source templates had these three links rotated by one position, which a test
+now guards against.
 
 ## Deploy
 
