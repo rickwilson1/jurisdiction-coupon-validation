@@ -1456,8 +1456,8 @@ async def ingest_cimcloud_email(
     if "application/json" in content_type:
         try:
             data = await request.json()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid JSON body") from e
         html_body = data.get("body", "") if isinstance(data, dict) else ""
         subject = data.get("subject") if isinstance(data, dict) else None
     else:
@@ -1471,7 +1471,7 @@ async def ingest_cimcloud_email(
         return {"status": "skipped", "reason": str(e)}
     except Exception as e:
         logger.exception("CIMcloud parser crashed (subject=%r)", subject)
-        raise HTTPException(status_code=400, detail=f"Parse error: {e}")
+        raise HTTPException(status_code=400, detail=f"Parse error: {e}") from e
 
     logger.info(
         "Parsed CIMcloud email subject=%r → order_number=%s coupon=%s qty=%s",
@@ -1649,4 +1649,4 @@ async def delivery_schedule(
         orders.sort(key=lambda x: x.get("processed_at", ""), reverse=True)
         return {"status": "ok", "count": len(orders), "orders": orders}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

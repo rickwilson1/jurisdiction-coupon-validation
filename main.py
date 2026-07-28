@@ -1,18 +1,18 @@
-import requests
-import geopandas as gpd
-import pandas as pd
-from fastapi import FastAPI, Query, Request, UploadFile, File, Header, HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from shapely.geometry import Point
+import logging
 import os
 import re
-import csv
-import logging
+from datetime import date, datetime
 from functools import lru_cache
-from datetime import datetime, date
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
+
+import geopandas as gpd
+import pandas as pd
+import requests
+from fastapi import FastAPI, File, Header, HTTPException, Query, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from google.cloud import storage as gcs_storage
+from shapely.geometry import Point
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 SHAPEFILE_PATH = os.path.join(os.path.dirname(__file__), "CDTFA_TaxDistricts.gpkg")
 COUPONS_CSV_PATH = os.path.join(os.path.dirname(__file__), "coupons.csv")
 COUPONS_XLSX_PATH = os.path.join(os.path.dirname(__file__), "coupons.xlsx")
-GEOCODE_URL = "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
+GEOCODE_URL = (
+    "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
+)
 ARCGIS_API_KEY = os.environ.get("ARCGIS_API_KEY")
 
 # Cloud Storage bucket (fallback source for coupon files, accessed via service account)
@@ -35,12 +37,11 @@ app = FastAPI(title="Coupon Validation API", version="2.0.0")
 
 # CORS configuration for browser-based clients (e.g., CIMcloud frontend)
 _cors_origins = os.environ.get(
-    "CORS_ALLOW_ORIGINS",
-    "https://commercial.agromin.com,https://shop.agromin.com"
+    "CORS_ALLOW_ORIGINS", "https://commercial.agromin.com,https://shop.agromin.com"
 )
 _cors_origin_regex = os.environ.get(
     "CORS_ALLOW_ORIGIN_REGEX",
-    r"^https://([a-z0-9-]+\.)?agromin\.com$|^https://([a-z0-9-]+\.)?agromin\.mycimstaging\.com$|^https://([a-z0-9-]+\.)?agromin\.cimstaging\.com$"
+    r"^https://([a-z0-9-]+\.)?agromin\.com$|^https://([a-z0-9-]+\.)?agromin\.mycimstaging\.com$|^https://([a-z0-9-]+\.)?agromin\.cimstaging\.com$",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +51,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ---------------------------------------------------
 # DATA LOADING (cached at startup)
@@ -63,11 +65,13 @@ def load_tax_districts():
     gdf = gdf.to_crs(epsg=4326)
     return gdf
 
+
 # ---------------------------------------------------
 # COUPON DATA LOADING
 # ---------------------------------------------------
 _coupon_cache = {}
 _coupon_cache_time = None
+
 
 def load_coupons(force_refresh: bool = False) -> dict:
     """
@@ -77,32 +81,32 @@ def load_coupons(force_refresh: bool = False) -> dict:
     Tries xlsx first, then falls back to csv.
     """
     global _coupon_cache, _coupon_cache_time
-    
+
     # Check cache (5 minute TTL)
     if not force_refresh and _coupon_cache and _coupon_cache_time:
         age = (datetime.now() - _coupon_cache_time).seconds
         if age < 300:  # 5 minutes
             return _coupon_cache
-    
+
     df = None
-    
+
     source = None
 
     # Prefer locally uploaded files so admin uploads take effect immediately.
     if os.path.exists(COUPONS_XLSX_PATH):
         try:
-            df = pd.read_excel(COUPONS_XLSX_PATH, engine='openpyxl')
+            df = pd.read_excel(COUPONS_XLSX_PATH, engine="openpyxl")
             source = f"local file {COUPONS_XLSX_PATH}"
         except Exception:
             pass
-    
+
     if df is None and os.path.exists(COUPONS_CSV_PATH):
         try:
             df = pd.read_csv(COUPONS_CSV_PATH)
             source = f"local file {COUPONS_CSV_PATH}"
         except Exception:
             pass
-    
+
     # Fall back to Cloud Storage (authenticated via service account)
     if df is None:
         try:
@@ -110,11 +114,11 @@ def load_coupons(force_refresh: bool = False) -> dict:
             bucket = client.bucket(COUPONS_GCS_BUCKET)
             blob = bucket.blob("coupons.xlsx")
             if blob.exists():
-                df = pd.read_excel(BytesIO(blob.download_as_bytes()), engine='openpyxl')
+                df = pd.read_excel(BytesIO(blob.download_as_bytes()), engine="openpyxl")
                 source = f"GCS gs://{COUPONS_GCS_BUCKET}/coupons.xlsx"
         except Exception:
             pass
-    
+
     if df is None:
         try:
             client = gcs_storage.Client()
@@ -125,24 +129,24 @@ def load_coupons(force_refresh: bool = False) -> dict:
                 source = f"GCS gs://{COUPONS_GCS_BUCKET}/coupons.csv"
         except Exception:
             pass
-    
+
     if df is None:
         logger.warning("No coupon data found from any source")
         return {}
-    
+
     # Parse DataFrame to coupons dict
     coupons = {}
     for _, row in df.iterrows():
-        code = str(row.get('Coupon', '')).strip().upper()
-        if code and code != 'NAN':
+        code = str(row.get("Coupon", "")).strip().upper()
+        if code and code != "NAN":
             coupons[code] = {
-                'code': code,
-                'status': str(row.get('Program Status', '')).strip(),
-                'jurisdiction': str(row.get('Jurisdiction', '')).strip(),
-                'start_date': parse_date(row.get('Start Date')),
-                'end_date': parse_date(row.get('End Date')),
+                "code": code,
+                "status": str(row.get("Program Status", "")).strip(),
+                "jurisdiction": str(row.get("Jurisdiction", "")).strip(),
+                "start_date": parse_date(row.get("Start Date")),
+                "end_date": parse_date(row.get("End Date")),
             }
-    
+
     _coupon_cache = coupons
     _coupon_cache_time = datetime.now()
     logger.info("Loaded %d coupons from %s", len(coupons), source)
@@ -153,23 +157,23 @@ def parse_date(date_val) -> date | None:
     """Parse date from string (M/D/YY) or pandas Timestamp."""
     if date_val is None or (isinstance(date_val, float) and pd.isna(date_val)):
         return None
-    
+
     # Handle pandas Timestamp
     if isinstance(date_val, pd.Timestamp):
         return date_val.date()
-    
+
     # Handle datetime
     if isinstance(date_val, datetime):
         return date_val.date()
-    
+
     # Handle date
     if isinstance(date_val, date):
         return date_val
-    
+
     # Handle string
     try:
         date_str = str(date_val).strip()
-        if not date_str or date_str.lower() == 'nan':
+        if not date_str or date_str.lower() == "nan":
             return None
         # Handle M/D/YY format
         return datetime.strptime(date_str, "%m/%d/%y").date()
@@ -184,15 +188,15 @@ def parse_date(date_val) -> date | None:
 def validate_coupon_dates(coupon: dict) -> tuple[bool, str]:
     """Check if coupon is within valid date range."""
     today = date.today()
-    start = coupon.get('start_date')
-    end = coupon.get('end_date')
-    
+    start = coupon.get("start_date")
+    end = coupon.get("end_date")
+
     if start and today < start:
         return False, f"Coupon not yet active (starts {start.strftime('%m/%d/%Y')})"
-    
+
     if end and today > end:
         return False, f"Coupon expired (ended {end.strftime('%m/%d/%Y')})"
-    
+
     return True, "Valid"
 
 
@@ -201,6 +205,7 @@ def validate_coupon_dates(coupon: dict) -> tuple[bool, str]:
 async def startup_event():
     load_tax_districts()
     load_coupons()
+
 
 # ---------------------------------------------------
 # HELPERS
@@ -245,28 +250,28 @@ def normalize_jurisdiction(name: str) -> str:
     """
     if not name:
         return ""
-    
+
     normalized = name.lower().strip()
-    
+
     # Remove common patterns
     patterns = [
-        r'\bcity of\b',
-        r',\s*city of\b',
-        r'\bcity\b',
-        r'\bcounty of\b',
-        r',\s*county of\b',
-        r'\bcounty\b',
+        r"\bcity of\b",
+        r",\s*city of\b",
+        r"\bcity\b",
+        r"\bcounty of\b",
+        r",\s*county of\b",
+        r"\bcounty\b",
     ]
-    
+
     for pattern in patterns:
-        normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
-    
+        normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE)
+
     return normalized.strip()
 
 
 def is_city_claim(jurisdiction: str) -> bool:
     """Check if the claimed jurisdiction is a city (contains 'city' anywhere)."""
-    return 'city' in jurisdiction.lower()
+    return "city" in jurisdiction.lower()
 
 
 def is_unincorporated_area(city_name: str | None) -> bool:
@@ -290,7 +295,7 @@ def jurisdictions_match(claimed: str, actual_city: str, actual_county: str) -> t
     Returns (match: bool, actual_jurisdiction: str)
     """
     normalized_claim = normalize_jurisdiction(claimed)
-    
+
     if is_city_claim(claimed):
         # Must match city
         if actual_city:
@@ -318,11 +323,11 @@ def jurisdictions_match(claimed: str, actual_city: str, actual_county: str) -> t
 @app.get("/api/validate")
 async def validate_jurisdiction(
     address: str = Query(..., description="Full California address"),
-    jurisdiction: str = Query(..., description="Claimed jurisdiction (include 'City' if city)")
+    jurisdiction: str = Query(..., description="Claimed jurisdiction (include 'City' if city)"),
 ):
     """
     Validate if an address is within the claimed jurisdiction.
-    
+
     Returns:
     - status: "accepted", "denied", or "error"
     - claimed_jurisdiction: what was submitted
@@ -332,42 +337,34 @@ async def validate_jurisdiction(
     try:
         # Geocode the address
         lat, lon, matched_address = geocode_address(address)
-        
+
         if lat is None or lon is None:
-            return {
-                "status": "error",
-                "message": "Address could not be geocoded"
-            }
-        
+            return {"status": "error", "message": "Address could not be geocoded"}
+
         # Find tax district
         gdf = load_tax_districts()
         district = find_tax_district(lat, lon, gdf)
-        
+
         if not district:
             return {
                 "status": "error",
-                "message": "Address not found in California tax district data"
+                "message": "Address not found in California tax district data",
             }
-        
+
         # Compare jurisdictions
         match, actual = jurisdictions_match(
-            jurisdiction,
-            district.get("city"),
-            district.get("county")
+            jurisdiction, district.get("city"), district.get("county")
         )
-        
+
         return {
             "status": "accepted" if match else "denied",
             "claimed_jurisdiction": jurisdiction,
             "actual_jurisdiction": actual,
-            "matched_address": matched_address
+            "matched_address": matched_address,
         }
-        
+
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        return {"status": "error", "message": str(e)}
 
 
 # ---------------------------------------------------
@@ -376,17 +373,17 @@ async def validate_jurisdiction(
 @app.get("/api/validate-coupon")
 async def validate_coupon(
     address: str = Query(..., description="Full California address"),
-    coupon: str = Query(..., description="Coupon code")
+    coupon: str = Query(..., description="Coupon code"),
 ):
     """
     Validate if a coupon is valid for the given address.
-    
+
     Checks:
     1. Coupon exists
     2. Coupon is Active
     3. Current date is within Start/End date range
     4. Address is within the coupon's jurisdiction
-    
+
     Returns:
     - status: "accepted", "denied", or "error"
     - coupon: the coupon code
@@ -396,75 +393,69 @@ async def validate_coupon(
     try:
         # Normalize coupon code
         coupon_code = coupon.strip().upper()
-        
+
         # Load coupon data
         coupons = load_coupons()
-        
+
         # Check if coupon exists
         if coupon_code not in coupons:
-            return {
-                "status": "denied",
-                "coupon": coupon_code,
-                "reason": "Coupon code not found"
-            }
-        
+            return {"status": "denied", "coupon": coupon_code, "reason": "Coupon code not found"}
+
         coupon_data = coupons[coupon_code]
-        
+
         # Check if coupon is active
-        if coupon_data['status'].lower() != 'active':
+        if coupon_data["status"].lower() != "active":
             return {
                 "status": "denied",
                 "coupon": coupon_code,
-                "jurisdiction": coupon_data['jurisdiction'],
-                "reason": f"Coupon is {coupon_data['status']}"
+                "jurisdiction": coupon_data["jurisdiction"],
+                "reason": f"Coupon is {coupon_data['status']}",
             }
-        
+
         # Check date validity
         date_valid, date_reason = validate_coupon_dates(coupon_data)
         if not date_valid:
             return {
                 "status": "denied",
                 "coupon": coupon_code,
-                "jurisdiction": coupon_data['jurisdiction'],
-                "reason": date_reason
+                "jurisdiction": coupon_data["jurisdiction"],
+                "reason": date_reason,
             }
-        
+
         # Geocode the address
         lat, lon, matched_address = geocode_address(address)
-        
+
         if lat is None or lon is None:
             return {
                 "status": "error",
                 "coupon": coupon_code,
-                "reason": "Address could not be geocoded"
+                "reason": "Address could not be geocoded",
             }
-        
+
         # Find tax district
         gdf = load_tax_districts()
         district = find_tax_district(lat, lon, gdf)
-        
+
         if not district:
             return {
                 "status": "error",
                 "coupon": coupon_code,
-                "reason": "Address not found in California tax district data"
+                "reason": "Address not found in California tax district data",
             }
-        
+
         # Compare jurisdictions
-        claimed_jurisdiction = coupon_data['jurisdiction']
+        claimed_jurisdiction = coupon_data["jurisdiction"]
         match, actual = jurisdictions_match(
-            claimed_jurisdiction,
-            district.get("city"),
-            district.get("county")
+            claimed_jurisdiction, district.get("city"), district.get("county")
         )
-        
+
         if match:
             return {
                 "status": "accepted",
                 "coupon": coupon_code,
                 "jurisdiction": claimed_jurisdiction,
                 "matched_address": matched_address,
-                "reason": "Address is within coupon jurisdiction"
+                "reason": "Address is within coupon jurisdiction",
             }
         else:
             return {
@@ -473,15 +464,11 @@ async def validate_coupon(
                 "jurisdiction": claimed_jurisdiction,
                 "actual_jurisdiction": actual,
                 "matched_address": matched_address,
-                "reason": f"Address is in {actual}, not {claimed_jurisdiction}"
+                "reason": f"Address is in {actual}, not {claimed_jurisdiction}",
             }
-        
+
     except Exception as e:
-        return {
-            "status": "error",
-            "coupon": coupon,
-            "reason": str(e)
-        }
+        return {"status": "error", "coupon": coupon, "reason": str(e)}
 
 
 # ---------------------------------------------------
@@ -662,6 +649,7 @@ HTML_FORM = """
 </html>
 """
 
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the web form for manual lookups."""
@@ -685,7 +673,11 @@ def _sync_to_gcs(content: bytes, blob_name: str):
         client = gcs_storage.Client()
         bucket = client.bucket(COUPONS_GCS_BUCKET)
         blob = bucket.blob(blob_name)
-        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if blob_name.endswith(".xlsx") else "text/csv"
+        content_type = (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            if blob_name.endswith(".xlsx")
+            else "text/csv"
+        )
         blob.cache_control = "no-cache, max-age=0"
         blob.upload_from_string(content, content_type=content_type)
         logger.info("Synced %s to GCS bucket %s", blob_name, COUPONS_GCS_BUCKET)
@@ -700,63 +692,60 @@ def _sync_to_gcs(content: bytes, blob_name: str):
 async def upload_coupons(
     file: UploadFile = File(None),
     x_api_key: str = Header(None, alias="X-API-Key"),
-    request: Request = None
+    request: Request = None,
 ):
     """
     Upload a new coupon file (xlsx or csv) directly to the API.
     Saves locally, syncs to GCS, and refreshes cache.
     Requires X-API-Key header for authentication.
     Used by Power Automate to sync from SharePoint.
-    
+
     Accepts both multipart form uploads and raw binary data.
     """
     # Verify API key
     if x_api_key != UPLOAD_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
-    
+
     try:
         # Get file content - either from form upload or raw body
         if file and file.filename:
             content = await file.read()
-            filename = file.filename.lower()
         else:
             # Raw binary upload from Power Automate
             content = await request.body()
-            # Default to xlsx since that's what SharePoint sends
-            filename = "coupons.xlsx"
-        
+
         if not content:
             raise HTTPException(status_code=400, detail="No file content received")
-        
+
         # Determine file type from content (Excel files start with PK)
-        is_excel = content[:2] == b'PK'
+        is_excel = content[:2] == b"PK"
         if is_excel:
             save_path = COUPONS_XLSX_PATH
             gcs_blob_name = "coupons.xlsx"
         else:
             save_path = COUPONS_CSV_PATH
             gcs_blob_name = "coupons.csv"
-            
-        with open(save_path, 'wb') as f:
+
+        with open(save_path, "wb") as f:
             f.write(content)
-        
+
         _sync_to_gcs(content, gcs_blob_name)
-        
+
         # Clear the coupon cache to force reload
         global _coupon_cache, _coupon_cache_time
         _coupon_cache = {}
         _coupon_cache_time = None
-        
+
         # Reload coupons to verify file is valid
         coupons = load_coupons(force_refresh=True)
-        
+
         return {
             "status": "success",
-            "message": f"Uploaded and processed coupon file",
-            "coupons_loaded": len(coupons)
+            "message": "Uploaded and processed coupon file",
+            "coupons_loaded": len(coupons),
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

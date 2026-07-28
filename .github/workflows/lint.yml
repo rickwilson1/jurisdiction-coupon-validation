@@ -1,0 +1,30 @@
+name: Lint (Ruff)
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Ruff
+        run: pip install "ruff==0.15.20"
+
+      - name: Ruff lint check
+        run: ruff check --output-format=github .
+
+      - name: Ruff format check (report only)
+        run: ruff format --check --diff .
+        continue-on-error: true

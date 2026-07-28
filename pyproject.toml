@@ -1,14 +1,33 @@
 [tool.ruff]
-# Lint against the Cloud Run runtime, not the local venv (3.14)
+# Lint against the Cloud Run runtime, not the local venv (3.14).
+# dispatch/Dockerfile is python:3.11-slim, so py311 is the floor.
 target-version = "py311"
 line-length = 100
 extend-exclude = [".venv", "docs", "redirect"]
 
 [tool.ruff.lint]
-# E/W pycodestyle, F pyflakes, I import-sort, UP pyupgrade, B bugbear, C4 comprehensions
+# E/W pycodestyle, F pyflakes, I import-sort, UP pyupgrade, B bugbear, C4 comprehensions.
+# Deliberately broader than the conservative set the lint workflow shipped with.
 select = ["E", "W", "F", "I", "UP", "B", "C4"]
 ignore = [
     "E501",  # line length handled by the formatter, not worth blocking on
+]
+
+[tool.ruff.lint.per-file-ignores]
+# main.py embeds the validator's HTML page as a multi-line string. W293 is a
+# physical-line check, so it also flags blank lines inside that markup and
+# inside docstrings, where the only available fix would alter served output.
+"main.py" = ["W293"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom puts these calls in argument defaults
+# by design, which B008 would otherwise reject.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Query",
 ]
 
 [tool.ruff.format]
