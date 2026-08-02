@@ -16,6 +16,7 @@ import logging
 import os
 import quopri
 import re
+import textwrap
 import time
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
@@ -124,7 +125,6 @@ GREENERIES = [
             "https://oclandfills.com/sites/ocwr/files/2025-12/"
             "Olinda%20New%20Compost%20%26%20Mulch%20Pick%20Up%20Area%20%284%29.pdf"
         ),
-        "note": "(New Pick Up Area)",
     },
 ]
 
@@ -686,17 +686,33 @@ def clean_display_address(addr: str) -> str:
     return ", ".join(parts)
 
 
-def _greenery_block_html(selected_yard_key: str | None = None) -> str:
-    """Render the three OCWR greenery blocks, flagging the selected yard."""
-    blocks = []
+def _selected_greenery(selected_yard_key: str | None) -> dict | None:
+    """The greenery bought at checkout, or None if shipping_method didn't resolve."""
     for site in GREENERIES:
+        if site["yard_key"] == selected_yard_key:
+            return site
+    return None
+
+
+def _sites_to_show(selected_yard_key: str | None) -> list[dict]:
+    """Only the yard chosen at checkout, because the customer cannot switch later.
+
+    Listing all three reads as a menu and invites a drive to the wrong landfill,
+    up to 30 miles off, and a yard that has no order to fill. It also breaks
+    reconciliation against the yard column on Greg's Master Sheet. All three
+    appear only when the selection didn't resolve and we don't know the yard.
+    """
+    site = _selected_greenery(selected_yard_key)
+    return [site] if site else list(GREENERIES)
+
+
+def _greenery_block_html(selected_yard_key: str | None = None) -> str:
+    """Render the customer's greenery, or all three if the yard didn't resolve."""
+    blocks = []
+    for site in _sites_to_show(selected_yard_key):
         heading = html.escape(site["greenery"])
         if site.get("note"):
             heading += f" {html.escape(site['note'])}"
-        if selected_yard_key and site["yard_key"] == selected_yard_key:
-            heading += (
-                ' <span style="color:#1f6f3f;">&mdash; the location you selected at checkout</span>'
-            )
         address = "<br>".join(html.escape(line) for line in site["address_lines"])
         blocks.append(
             f'<p style="margin:0 0 14px 0;"><strong>{heading}</strong><br>'
@@ -711,12 +727,10 @@ def _greenery_block_html(selected_yard_key: str | None = None) -> str:
 
 def _greenery_block_text(selected_yard_key: str | None = None) -> str:
     lines = []
-    for site in GREENERIES:
+    for site in _sites_to_show(selected_yard_key):
         heading = site["greenery"]
         if site.get("note"):
             heading += f" {site['note']}"
-        if selected_yard_key and site["yard_key"] == selected_yard_key:
-            heading += " — the location you selected at checkout"
         lines.append(heading)
         lines.append(site["hours"])
         lines.extend(site["address_lines"])
@@ -726,6 +740,25 @@ def _greenery_block_text(selected_yard_key: str | None = None) -> str:
         )
         lines.append("")
     return "\n".join(lines)
+
+
+def _selected_location_line(selected_yard_key: str | None) -> str:
+    """State the binding pickup location. The checkout selection is final."""
+    site = _selected_greenery(selected_yard_key)
+    if site:
+        return (
+            f"Pick up at {site['greenery']}, the location you selected at checkout. "
+            "Your order cannot be filled at another greenery."
+        )
+    return "Choose any one of the greenery locations below for pickup."
+
+
+def _appointment_location_clause(selected_yard_key: str | None) -> str:
+    """Tell the customer which location to book, rather than inviting a choice."""
+    site = _selected_greenery(selected_yard_key)
+    if site:
+        return f"be sure to select {site['greenery']}, the location you chose at checkout"
+    return "be sure to select the preferred service location (Valencia, Capistrano or Bee Canyon)"
 
 
 def _footer_html() -> str:
@@ -769,8 +802,7 @@ and Recycling&rsquo;s Free Compost and Mulch Program.</p>
 your material.</p>
 <p style="margin:0 0 14px 0;"><strong>Use this
 <a href="{PICKUP_APPOINTMENT_URL}">LINK</a> to schedule an appointment to pick up your
-compost/mulch</strong> - be sure to select the preferred service location (Valencia,
-Capistrano or Bee Canyon)</p>
+compost/mulch</strong> - {_appointment_location_clause(selected)}</p>
 <p style="margin:0 0 14px 0;">You will receive email confirmation when you submit your
 request with instructions on when, where, and how to pick up your compost/mulch.</p>
 <p style="margin:0 0 14px 0;"><strong>Please note that for any order under 5 yards, the
@@ -799,9 +831,8 @@ Compost and Mulch Program.
 
 Please review the following pick-up instructions for your material.
 
-Use this link to schedule an appointment to pick up your compost/mulch - be
-sure to select the preferred service location (Valencia, Capistrano or Bee
-Canyon):
+Use this link to schedule an appointment to pick up your compost/mulch -
+{textwrap.fill(_appointment_location_clause(selected), 76)}:
 {PICKUP_APPOINTMENT_URL}
 
 You will receive email confirmation when you submit your request with
@@ -862,8 +893,7 @@ before leaving the site.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
 Tips</a> website for details on the difference between compost and mulch and for tips on
 composting.</p>
-<p style="margin:0 0 14px 0;"><strong>Choose any one of the greenery locations below for
-pickup.</strong></p>
+<p style="margin:0 0 14px 0;"><strong>{_selected_location_line(selected)}</strong></p>
 {_greenery_block_html(selected)}
 {_footer_html()}
 </body></html>"""
@@ -903,7 +933,7 @@ Visit Compost and Mulch Tips for details on the difference between compost and
 mulch and for tips on composting:
 {COMPOST_TIPS_URL}
 
-Choose any one of the greenery locations below for pickup.
+{textwrap.fill(_selected_location_line(selected), 76)}
 
 {_greenery_block_text(selected)}
 {_footer_text()}"""
