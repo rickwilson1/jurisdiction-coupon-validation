@@ -653,6 +653,25 @@ def describe_materials(order: "OrderPayload") -> str:
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
+def bulk_cubic_yards(order: "OrderPayload") -> float:
+    """Cubic yards across all line items, which is what the 5-yard split measures.
+
+    Mixed orders must be added up: 2 yards of compost plus 4 of mulch is a
+    6-yard order and needs the staff-load email, even though no single line
+    item clears 5.
+
+    Only cubic-yard items count. Line items carry mixed units, so summing raw
+    quantities would score a 10-bag order as 10 against a threshold denominated
+    in yards, and send someone with a car boot full of 1cf bags instructions
+    demanding a commercial truck and a weigh-in.
+    """
+    return sum(
+        item.qty
+        for item in order.line_items
+        if _display_material(item.description)[1] == "cubic yard"
+    )
+
+
 def clean_display_address(addr: str) -> str:
     """Trim CIMcloud shipping-address noise for customer-facing display.
 
@@ -762,8 +781,7 @@ material into your own containers. Please leave these for the next customers.</p
 <p style="margin:0 0 14px 0;">There will be a QR code at the self-serve sites for you to
 submit confirmation of your order fulfillment. This is extremely helpful as we track
 procurement for state mandated SB 1383 requirements.</p>
-<p style="margin:0 0 14px 0;">Please bring a copy of your email confirmation to verify
-residency.</p>
+<p style="margin:0 0 14px 0;">Please bring a copy of your email confirmation.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
 Tips</a> website for details on the difference between compost and mulch and for tips on
 composting.</p>
@@ -800,7 +818,7 @@ There will be a QR code at the self-serve sites for you to submit confirmation
 of your order fulfillment. This is extremely helpful as we track procurement
 for state mandated SB 1383 requirements.
 
-Please bring a copy of your email confirmation to verify residency.
+Please bring a copy of your email confirmation.
 
 Visit Compost and Mulch Tips for details on the difference between compost and
 mulch and for tips on composting:
@@ -826,29 +844,26 @@ Recycling&rsquo;s Free Compost and Mulch Program.</p>
 <p style="margin:0 0 14px 0;">Please review the following pick up instructions for your
 material:</p>
 <p style="margin:0 0 14px 0;"><strong>You must have a commercial truck or heavy-duty
-trailer</strong> in order for our greenery crew to assist with loading using heavy
-equipment.</p>
-<p style="margin:0 0 14px 0;">When you arrive at the landfill, check in at the fee booth
-and weigh in at the scales.</p>
-<p style="margin:0 0 14px 0;">You will be required to present your order confirmation and
-a <strong>valid photo I.D. to verify residency.</strong></p>
-<p style="margin:0 0 14px 0;">You will then be directed to the greenery.</p>
-<p style="margin:0 0 14px 0;">Please Note: We can only load commercial TRUCKS and
-TRAILERS with capacity for at least 5 cubic yards of bulk material. Trailers will require
-solid sides and floor or the customer will be required to provide their own tarps to
-prevent spilling during transport.</p>
+trailer for at least 5 cubic yards of bulk material</strong> in order for our greenery
+crew to assist with loading using heavy equipment. Trailers will require solid sides and
+flooring, or you MUST bring your own tarps to prevent spilling during transport.</p>
 <p style="margin:0 0 14px 0;">NO CARS. NO MINIVANS. If you do not have a commercial truck
-or heavy duty trailer, you will be redirected to the public self-haul area to
+or heavy-duty trailer, you will be redirected to the public self-haul area to
 self-load.</p>
-<p style="margin:0 0 14px 0;">NO SELF-LOADING at the greenery.</p>
-<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers 150 Sq.
-Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1 &frac12;
-Cubic Yards of Compost per load.</p>
-<p style="margin:0 0 14px 0;">You must weigh out at the scales before leaving the
-site.</p>
+<p style="margin:0 0 14px 0;">When you arrive at the landfill, check in at the fee booth,
+present a copy of your email confirmation, and weigh in at the scales.</p>
+<p style="margin:0 0 14px 0;">You will then be directed to the greenery for loading
+assistance. NO SELF-LOADING at the greenery.</p>
+<p style="margin:0 0 14px 0;">Upon exiting the landfill, your vehicle must be weighed
+before leaving the site.</p>
+<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers about
+108 Sq. Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1
+&frac12; Cubic Yards of Compost per load.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
 Tips</a> website for details on the difference between compost and mulch and for tips on
 composting.</p>
+<p style="margin:0 0 14px 0;"><strong>Choose any one of the greenery locations below for
+pickup.</strong></p>
 {_greenery_block_html(selected)}
 {_footer_html()}
 </body></html>"""
@@ -863,36 +878,32 @@ Mulch Program.
 
 Please review the following pick up instructions for your material:
 
-You must have a commercial truck or heavy-duty trailer in order for our
-greenery crew to assist with loading using heavy equipment.
+You must have a commercial truck or heavy-duty trailer for at least 5 cubic
+yards of bulk material in order for our greenery crew to assist with loading
+using heavy equipment. Trailers will require solid sides and flooring, or you
+MUST bring your own tarps to prevent spilling during transport.
 
-When you arrive at the landfill, check in at the fee booth and weigh in at the
-scales.
-
-You will be required to present your order confirmation and a valid photo I.D.
-to verify residency.
-
-You will then be directed to the greenery.
-
-Please Note: We can only load commercial TRUCKS and TRAILERS with capacity for
-at least 5 cubic yards of bulk material. Trailers will require solid sides and
-floor or the customer will be required to provide their own tarps to prevent
-spilling during transport.
-
-NO CARS. NO MINIVANS. If you do not have a commercial truck or heavy duty
+NO CARS. NO MINIVANS. If you do not have a commercial truck or heavy-duty
 trailer, you will be redirected to the public self-haul area to self-load.
 
-NO SELF-LOADING at the greenery.
+When you arrive at the landfill, check in at the fee booth, present a copy of
+your email confirmation, and weigh in at the scales.
 
-For your reference, 1 Cubic Yard of Compost covers 150 Sq. Feet at 3"
+You will then be directed to the greenery for loading assistance. NO
+SELF-LOADING at the greenery.
+
+Upon exiting the landfill, your vehicle must be weighed before leaving the
+site.
+
+For your reference, 1 Cubic Yard of Compost covers about 108 Sq. Feet at 3"
 Layer/Depth. Most mid-sized pick-up trucks can hold 1/2 - 1 1/2 Cubic Yards of
 Compost per load.
-
-You must weigh out at the scales before leaving the site.
 
 Visit Compost and Mulch Tips for details on the difference between compost and
 mulch and for tips on composting:
 {COMPOST_TIPS_URL}
+
+Choose any one of the greenery locations below for pickup.
 
 {_greenery_block_text(selected)}
 {_footer_text()}"""
@@ -1300,6 +1311,7 @@ async def root():
 def _process_order(order: OrderPayload) -> dict:
     coupon_code = order.coupon_code.strip().upper()
     total_qty = sum(item.qty for item in order.line_items)
+    bulk_qty = bulk_cubic_yards(order)
     material = order.line_items[0].description if order.line_items else "material"
     qty_str = format_qty(total_qty)
 
@@ -1307,7 +1319,7 @@ def _process_order(order: OrderPayload) -> dict:
         routing = "delivery"
         region = infer_region_from_address(order.shipping_address)
     else:
-        routing = "pickup_self_load" if total_qty < 5 else "pickup_staff_load"
+        routing = "pickup_self_load" if bulk_qty < 5 else "pickup_staff_load"
         yard = get_yard_for_order(order.shipping_method)
         region = yard.get("region", "unknown")
 
@@ -1325,6 +1337,7 @@ def _process_order(order: OrderPayload) -> dict:
                 "shipping_method": order.shipping_method,
                 "shipping_address": order.shipping_address,
                 "total_qty": total_qty,
+                "bulk_cubic_yards": bulk_qty,
                 "material": material,
                 "order_date": order.order_date,
                 "customer_phone": order.customer_phone,
