@@ -266,6 +266,33 @@ def get_delivery_coordinator_name(region: str) -> str:
     return DELIVERY_COORDINATOR_NAMES.get(region, DELIVERY_COORDINATOR_NAMES["oc"])
 
 
+def get_reply_to(routing: str, region: str) -> list:
+    """Who a customer reaches when they hit Reply on a confirmation.
+
+    Without this the reply lands in dispatch@agromin.com, a mailbox nobody
+    signs into, and sits until someone happens to look. The owner is listed
+    first, with the dispatch mailbox alongside so the thread stays visible to
+    everyone with access and survives the owner being out.
+
+    Delivery goes to the coordinator the email already names as following up,
+    so the reply reaches the person the customer was just told to expect.
+    Ofelia stays a CC rather than a reply target: she is the OCWR escalation
+    path, and county staff should not be the default front line for Agromin's
+    customer mail.
+    """
+    if routing == "delivery":
+        coordinators = get_delivery_coordinator_emails(region)
+        owners = coordinators[:1]
+    else:
+        owners = [KENDALL_EMAIL] if KENDALL_EMAIL else []
+
+    recipients = []
+    for addr in [*owners, MAIL_SENDER]:
+        if addr and addr not in recipients:
+            recipients.append(addr)
+    return recipients
+
+
 def format_qty(qty: float) -> str:
     return str(int(qty)) if qty == int(qty) else str(qty)
 
@@ -511,6 +538,7 @@ def send_email(
     cc: list = None,
     bcc: list = None,
     html_body: str = None,
+    reply_to: list = None,
 ) -> bool:
     """Send an email via Microsoft Graph as MAIL_SENDER (dispatch@agromin.com).
 
@@ -539,6 +567,8 @@ def send_email(
             message["ccRecipients"] = [{"emailAddress": {"address": c}} for c in cc]
         if bcc:
             message["bccRecipients"] = [{"emailAddress": {"address": b}} for b in bcc]
+        if reply_to:
+            message["replyTo"] = [{"emailAddress": {"address": r}} for r in reply_to]
 
         url = f"https://graph.microsoft.com/v1.0/users/{MAIL_SENDER}/sendMail"
         resp = requests.post(
@@ -1419,6 +1449,7 @@ def _process_order(order: OrderPayload) -> dict:
         logger.error("Firestore write failed for order %s: %s", order.order_number, e)
 
     cc_list = [OFELIA_EMAIL] if OFELIA_EMAIL else []
+    reply_to = get_reply_to(routing, region)
 
     if routing == "delivery":
         # Kendall's delivery copy tells the customer "I am CC'ing Greg Jackson",
@@ -1439,6 +1470,7 @@ def _process_order(order: OrderPayload) -> dict:
             cc=cc_list,
             bcc=CONFIRMATION_BCC,
             html_body=html_body,
+            reply_to=reply_to,
         )
 
         alert_body = DELIVERY_ALERT_TEMPLATE.format(
@@ -1469,6 +1501,7 @@ def _process_order(order: OrderPayload) -> dict:
             cc=cc_list,
             bcc=CONFIRMATION_BCC,
             html_body=html_body,
+            reply_to=reply_to,
         )
 
     # Record whether the customer email actually left the building. Without this
@@ -1480,6 +1513,7 @@ def _process_order(order: OrderPayload) -> dict:
                 "customer_email_sent": customer_email_sent,
                 "customer_email_cc": cc_list,
                 "customer_email_bcc": CONFIRMATION_BCC,
+                "customer_email_reply_to": reply_to,
             }
         )
     except Exception as e:

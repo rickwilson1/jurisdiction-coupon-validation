@@ -1,0 +1,102 @@
+Team,
+
+When you place a test order using one of the OCWR coupon codes, here's exactly what the new automated dispatch system will send and to whom. All emails come from dispatch@agromin.com.
+
+
+===========================================================
+EVERY ORDER — CUSTOMER GETS AN EMAIL
+===========================================================
+
+The customer who placed the order receives a confirmation email with instructions specific to their order type:
+
+  • Pickup, less than 5 cubic yards
+    → "Self-loading pickup" instructions: bring buckets, ID, and a vehicle.
+       Includes the assigned yard's address, phone, and hours.
+
+  • Pickup, 5 cubic yards or more
+    → "Staff-loaded pickup" instructions: customer must bring a truck or
+       trailer with solid sides; OCWR staff loads with heavy equipment.
+
+  • Delivery
+    → "Delivery confirmation": acknowledges the order and tells the
+       customer Agromin will contact them within 1 business day to
+       schedule.
+
+Ofelia (ofelia.velarde-garcia@ocwr.ocgov.com) is automatically CC'd on
+every customer email.
+
+Kendall (kendall@agromin.com) is automatically BCC'd on every customer
+email, so she sees exactly what the customer received. BCC rather than CC
+keeps Agromin addresses off the header the customer sees.
+
+On delivery orders, Greg Jackson is also CC'd on the customer email —
+the delivery copy tells the customer "I am CC'ing Greg Jackson," so he is
+a real CC and not only a recipient of the internal alert below.
+
+
+===========================================================
+DELIVERY ORDERS ONLY — COORDINATORS GET AN ALERT
+===========================================================
+
+If the order is a delivery, a SECOND email is sent — separately from the
+customer email — to the OCWR delivery coordinators, with the customer's
+name, phone, address, material, and quantity. This is the "please call
+this customer to schedule" alert.
+
+Recipients:
+  • Greg Jackson  (greg@agromin.com)
+  • Brian         (brian@agromin.com)
+  • Kendall       (kendall@agromin.com)
+
+Coordinator alerts are NOT CC'd to the customer or to Ofelia — only the
+three named coordinators see them.
+
+
+===========================================================
+QUICK REFERENCE
+===========================================================
+
+Order type        Customer   Ofelia CC   Greg CC   Kendall BCC   Coordinator alert
+-----------       --------   ---------   -------   -----------   -----------------
+Pickup (any size)   Yes        Yes         No        Yes           No
+Delivery            Yes        Yes         Yes       Yes           Greg, Brian, Kendall
+
+
+===========================================================
+WHAT CUSTOMERS SEE
+===========================================================
+
+The "From" address on every email is dispatch@agromin.com (a dedicated
+shared mailbox). Replies do not go there alone. Every customer email
+carries a Reply-To naming the person who owns follow-up, with
+dispatch@agromin.com alongside so the thread stays visible to everyone
+with mailbox access:
+
+  Pickup (any size)   Kendall + dispatch
+  Delivery, OC        Greg + dispatch
+  Delivery, Ventura   Chris + dispatch
+  Delivery, Sac       Rosa + dispatch
+
+The delivery Reply-To is the same coordinator the email names as
+following up, so a reply reaches the person the customer was just told
+to expect.
+
+Ofelia is CC'd on every customer email and sees the full thread, but she
+is the OCWR escalation path, not the first responder. County staff are
+not the default front line for Agromin's customer mail.
+
+
+===========================================================
+NOT IN SCOPE FOR THIS ROLLOUT
+===========================================================
+
+Ventura County and Sacramento coupon codes are in the system but are
+NOT being tested in this round. The OCWR program is the only active
+rollout right now. When Ventura and Sacramento launch, their delivery
+alerts will go to Chris (Ventura) and Rosa (Sacramento) — different
+recipients from OCWR.
+
+
+Reply to this email if anything looks off after your test orders.
+
+Rick
