@@ -695,12 +695,11 @@ def _selected_greenery(selected_yard_key: str | None) -> dict | None:
 
 
 def _sites_to_show(selected_yard_key: str | None) -> list[dict]:
-    """Only the yard chosen at checkout, because the customer cannot switch later.
+    """Under-5: only the yard chosen at checkout.
 
-    Listing all three reads as a menu and invites a drive to the wrong landfill,
-    up to 30 miles off, and a yard that has no order to fill. It also breaks
-    reconciliation against the yard column on Greg's Master Sheet. All three
-    appear only when the selection didn't resolve and we don't know the yard.
+    Over-5 uses the OCWR template instead, which lists all three and invites
+    the customer to choose any one. That open-choice path does not go through
+    this helper.
     """
     site = _selected_greenery(selected_yard_key)
     return [site] if site else list(GREENERIES)
@@ -742,15 +741,49 @@ def _greenery_block_text(selected_yard_key: str | None = None) -> str:
     return "\n".join(lines)
 
 
-def _selected_location_line(selected_yard_key: str | None) -> str:
-    """State the binding pickup location. The checkout selection is final."""
-    site = _selected_greenery(selected_yard_key)
-    if site:
-        return (
-            f"Pick up at {site['greenery']}, the location you selected at checkout. "
-            "Your order cannot be filled at another greenery."
+# OCWR over-5 template hours and Valencia address. Kept separate from GREENERIES
+# so the under-5 email (Kendall's template) keeps M-Sat shorthand, phones, and
+# the Valencia address without the N.
+_OCWR_OVER5_HOURS = {
+    "Frank R. Bowerman": "Monday - Saturday | 8 a.m. – 4 p.m.",
+    "Prima Deshecha": "Monday - Saturday | 8 a.m. – 4 p.m.",
+    "Olinda Alpha": "Monday - Saturday | 7 a.m. – 3 p.m.",
+}
+_OCWR_OVER5_ADDRESS = {
+    "Olinda Alpha": ["1942 N. Valencia Ave", "Brea, CA 92823"],
+}
+
+
+def _ocwr_over5_greenery_block_html() -> str:
+    """All three greeneries as the OCWR over-5 template lists them: no phones."""
+    blocks = []
+    for site in GREENERIES:
+        hours = _OCWR_OVER5_HOURS[site["yard_key"]]
+        address_lines = _OCWR_OVER5_ADDRESS.get(site["yard_key"], site["address_lines"])
+        address = "<br>".join(html.escape(line) for line in address_lines)
+        blocks.append(
+            f'<p style="margin:0 0 14px 0;"><strong>{html.escape(site["greenery"])}</strong><br>'
+            f"{html.escape(hours)}<br>"
+            f"{address}<br>"
+            f'<a href="{site["map_url"]}">Link to printable PDF map</a> for '
+            f"{html.escape(site['greenery'])} at {html.escape(site['landfill'])}</p>"
         )
-    return "Choose any one of the greenery locations below for pickup."
+    return "".join(blocks)
+
+
+def _ocwr_over5_greenery_block_text() -> str:
+    lines = []
+    for site in GREENERIES:
+        hours = _OCWR_OVER5_HOURS[site["yard_key"]]
+        address_lines = _OCWR_OVER5_ADDRESS.get(site["yard_key"], site["address_lines"])
+        lines.append(site["greenery"])
+        lines.append(hours)
+        lines.extend(address_lines)
+        lines.append(
+            f"Printable PDF map for {site['greenery']} at {site['landfill']}: {site['map_url']}"
+        )
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _appointment_location_clause(selected_yard_key: str | None) -> str:
@@ -863,9 +896,15 @@ mulch and for tips on composting:
 
 
 def build_pickup_staff_load_email(order: "OrderPayload", yard: dict) -> tuple:
-    """5 cubic yards and over: greenery crew loads with heavy equipment."""
+    """5 cubic yards and over: greenery crew loads with heavy equipment.
+
+    Body copy follows OCWR's Over 5 Cubic Yard Email Template Updated 7.29.26.
+    Map URLs stay the verified pairings in GREENERIES (the Word file rotates
+    them). Tips link stays the clean oclandfills.com URL (the Word file wraps
+    it in Proofpoint). Greeting and order reference stay for automation.
+    """
     material_phrase = describe_materials(order)
-    selected = yard.get("name")
+    _ = yard  # retained for call-site compatibility; OCWR lists all three sites
 
     html_body = f"""<html><body style="{_BODY_STYLE}">
 <p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
@@ -882,19 +921,20 @@ flooring, or you MUST bring your own tarps to prevent spilling during transport.
 or heavy-duty trailer, you will be redirected to the public self-haul area to
 self-load.</p>
 <p style="margin:0 0 14px 0;">When you arrive at the landfill, check in at the fee booth,
-present a copy of your email confirmation, and weigh in at the scales.</p>
+present your email confirmation, and weigh in at the scales.</p>
 <p style="margin:0 0 14px 0;">You will then be directed to the greenery for loading
 assistance. NO SELF-LOADING at the greenery.</p>
 <p style="margin:0 0 14px 0;">Upon exiting the landfill, your vehicle must be weighed
 before leaving the site.</p>
-<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers about
-108 Sq. Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1
-&frac12; Cubic Yards of Compost per load.</p>
+<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers 150 Sq.
+Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1 &frac12;
+Cubic Yards of Compost per load.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
 Tips</a> website for details on the difference between compost and mulch and for tips on
 composting.</p>
-<p style="margin:0 0 14px 0;"><strong>{_selected_location_line(selected)}</strong></p>
-{_greenery_block_html(selected)}
+<p style="margin:0 0 14px 0;"><strong>Choose any one of the greenery locations below for
+pickup and present your confirmation email at the fee booth.</strong></p>
+{_ocwr_over5_greenery_block_html()}
 {_footer_html()}
 </body></html>"""
 
@@ -916,8 +956,8 @@ MUST bring your own tarps to prevent spilling during transport.
 NO CARS. NO MINIVANS. If you do not have a commercial truck or heavy-duty
 trailer, you will be redirected to the public self-haul area to self-load.
 
-When you arrive at the landfill, check in at the fee booth, present a copy of
-your email confirmation, and weigh in at the scales.
+When you arrive at the landfill, check in at the fee booth, present your email
+confirmation, and weigh in at the scales.
 
 You will then be directed to the greenery for loading assistance. NO
 SELF-LOADING at the greenery.
@@ -925,7 +965,7 @@ SELF-LOADING at the greenery.
 Upon exiting the landfill, your vehicle must be weighed before leaving the
 site.
 
-For your reference, 1 Cubic Yard of Compost covers about 108 Sq. Feet at 3"
+For your reference, 1 Cubic Yard of Compost covers 150 Sq. Feet at 3"
 Layer/Depth. Most mid-sized pick-up trucks can hold 1/2 - 1 1/2 Cubic Yards of
 Compost per load.
 
@@ -933,9 +973,10 @@ Visit Compost and Mulch Tips for details on the difference between compost and
 mulch and for tips on composting:
 {COMPOST_TIPS_URL}
 
-{textwrap.fill(_selected_location_line(selected), 76)}
+Choose any one of the greenery locations below for pickup and present your
+confirmation email at the fee booth.
 
-{_greenery_block_text(selected)}
+{_ocwr_over5_greenery_block_text()}
 {_footer_text()}"""
 
     subject = f"Your Agromin Order #{order.order_number} — Compost/Mulch Pick Up Instructions"
