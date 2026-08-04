@@ -9,13 +9,25 @@ EVERY ORDER — CUSTOMER GETS AN EMAIL
 
 The customer who placed the order receives a confirmation email with instructions specific to their order type:
 
-  • Pickup, less than 5 cubic yards
-    → "Self-loading pickup" instructions: bring buckets, ID, and a vehicle.
-       Includes the assigned yard's address, phone, and hours.
+The 5-yard split is measured PER MATERIAL, not on the order total, because
+the crew loads with a bucket loader from a single pile. An order of 2 yards
+of compost plus 4 of mulch is two small piles, not a 6-yard job.
 
-  • Pickup, 5 cubic yards or more
+  • Pickup, every material under 5 cubic yards
+    → "Self-loading pickup" instructions: bring your own buckets and
+       containers. Lists all three greeneries with addresses, phones, and
+       hours, and the customer may collect from whichever they choose.
+
+  • Pickup, one material at 5 cubic yards or more, nothing else
     → "Staff-loaded pickup" instructions: customer must bring a truck or
        trailer with solid sides; OCWR staff loads with heavy equipment.
+
+  • Pickup, one material at 5 cubic yards or more ALONGSIDE another material
+    → Special order. OCWR does not coordinate mixed loads, so this fits
+       neither path: the large material qualifies for crew loading and the
+       remainder does not. The customer gets a short holding note saying we
+       will contact them within 1 business day and asking them not to travel
+       to a greenery yet. Kendall gets an alert and makes the call.
 
   • Delivery
     → "Delivery confirmation": acknowledges the order and tells the
@@ -32,6 +44,22 @@ keeps Agromin addresses off the header the customer sees.
 On delivery orders, Greg Jackson is also CC'd on the customer email —
 the delivery copy tells the customer "I am CC'ing Greg Jackson," so he is
 a real CC and not only a recipient of the internal alert below.
+
+
+===========================================================
+SPECIAL ORDERS — KENDALL GETS AN ALERT
+===========================================================
+
+A special order sends a SECOND email to Kendall with the customer's details,
+the material breakdown, and the yard they picked at checkout. Pickups are
+Kendall's lane, and the decision is an Agromin fulfillment call: one visit
+with the crew loading the bulk material and the customer self-loading the
+rest, or two separate visits.
+
+Not sent to Ofelia. She is CC'd on the customer's holding note and can see
+the thread, but she is the OCWR escalation path rather than the first
+responder. Add Brian as second cover by setting SPECIAL_ORDER_ALERT_TO to a
+comma-separated list; no deploy needed.
 
 
 ===========================================================
@@ -56,10 +84,12 @@ three named coordinators see them.
 QUICK REFERENCE
 ===========================================================
 
-Order type        Customer   Ofelia CC   Greg CC   Kendall BCC   Coordinator alert
------------       --------   ---------   -------   -----------   -----------------
-Pickup (any size)   Yes        Yes         No        Yes           No
-Delivery            Yes        Yes         Yes       Yes           Greg, Brian, Kendall
+Order type        Customer   Ofelia CC   Greg CC   Kendall BCC   Internal alert
+-----------       --------   ---------   -------   -----------   --------------
+Pickup, self-load   Yes        Yes         No        Yes          No
+Pickup, crew-load   Yes        Yes         No        Yes          No
+Pickup, special     Yes        Yes         No        Yes          Kendall
+Delivery            Yes        Yes         Yes       Yes          Greg, Brian, Kendall
 
 
 ===========================================================
@@ -72,7 +102,7 @@ carries a Reply-To naming the person who owns follow-up, with
 dispatch@agromin.com alongside so the thread stays visible to everyone
 with mailbox access:
 
-  Pickup (any size)   Kendall + dispatch
+  Pickup (all three)  Kendall + dispatch
   Delivery, OC        Greg + dispatch
   Delivery, Ventura   Chris + dispatch
   Delivery, Sac       Rosa + dispatch

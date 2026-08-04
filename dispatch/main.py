@@ -74,6 +74,16 @@ if _confirmation_bcc_env is None:
 else:
     CONFIRMATION_BCC = [e.strip() for e in _confirmation_bcc_env.split(",") if e.strip()]
 
+# Special orders (5+ yards of one material alongside another) need a human to
+# decide how the pickup runs. Kendall owns pickups, so the alert goes to her
+# (Kendall, 2026-08-04). Comma-separated env override so Brian can be added as
+# second cover without a deploy if volume grows.
+_special_order_to_env = os.environ.get("SPECIAL_ORDER_ALERT_TO")
+if _special_order_to_env is None:
+    SPECIAL_ORDER_ALERT_TO = [e for e in [KENDALL_EMAIL] if e]
+else:
+    SPECIAL_ORDER_ALERT_TO = [e.strip() for e in _special_order_to_env.split(",") if e.strip()]
+
 SUPPORT_EMAIL = "sales@agromin.com"
 SUPPORT_PHONE = "(805) 485-9200"
 
@@ -683,23 +693,54 @@ def describe_materials(order: "OrderPayload") -> str:
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
-def bulk_cubic_yards(order: "OrderPayload") -> float:
-    """Cubic yards across all line items, which is what the 5-yard split measures.
+def bulk_yards_by_material(order: "OrderPayload") -> dict[str, float]:
+    """Cubic yards per material, which is the grain the 5-yard rule works at.
 
-    Mixed orders must be added up: 2 yards of compost plus 4 of mulch is a
-    6-yard order and needs the staff-load email, even though no single line
-    item clears 5.
-
-    Only cubic-yard items count. Line items carry mixed units, so summing raw
+    Only cubic-yard items count. Line items carry mixed units, so counting raw
     quantities would score a 10-bag order as 10 against a threshold denominated
     in yards, and send someone with a car boot full of 1cf bags instructions
-    demanding a commercial truck and a weigh-in.
+    demanding a commercial truck and a weigh-in. Bagged goods are not sold
+    online today (Kendall, 2026-08-04); the filter stays as cover for the day
+    a bagged SKU appears.
+
+    Aggregating by material rather than by line item matters: six lines of a
+    1-yard compost SKU is one 6-yard material, not six small ones.
     """
-    return sum(
-        item.qty
-        for item in order.line_items
-        if _display_material(item.description)[1] == "cubic yard"
-    )
+    totals: dict[str, float] = {}
+    for item in order.line_items:
+        name, unit = _display_material(item.description)
+        if unit == "cubic yard":
+            totals[name] = totals.get(name, 0.0) + item.qty
+    return totals
+
+
+def bulk_cubic_yards(order: "OrderPayload") -> float:
+    """Total bulk yards on the order. Audit figure only; routing uses the max."""
+    return sum(bulk_yards_by_material(order).values())
+
+
+def classify_pickup(order: "OrderPayload") -> str:
+    """Pick the pickup email for an order, on the per-material 5-yard rule.
+
+    The crew loads with a bucket loader from a single pile, so the staff-load
+    path is denominated per material, not per order. Summing the order was
+    wrong: 2 yards of compost plus 4 of mulch is two sub-threshold piles, and
+    the old rule sent that customer an email demanding a commercial truck and a
+    weigh-in at the scales.
+
+    OCWR will not coordinate mixed loads (Kendall, 2026-08-04), so an order
+    carrying 5 or more yards of one material *alongside* another material can
+    satisfy neither path: the large material qualifies for crew loading while
+    the rest does not, and the crew-load email forbids the self-loading the
+    remainder needs. Those go to a human. A single material at 5 or more with
+    nothing else is the ordinary crew-load case.
+    """
+    by_material = bulk_yards_by_material(order)
+    if not by_material or max(by_material.values()) < 5:
+        return "pickup_self_load"
+    if len(by_material) > 1:
+        return "pickup_special_order"
+    return "pickup_staff_load"
 
 
 def clean_display_address(addr: str) -> str:
@@ -716,29 +757,15 @@ def clean_display_address(addr: str) -> str:
     return ", ".join(parts)
 
 
-def _selected_greenery(selected_yard_key: str | None) -> dict | None:
-    """The greenery bought at checkout, or None if shipping_method didn't resolve."""
-    for site in GREENERIES:
-        if site["yard_key"] == selected_yard_key:
-            return site
-    return None
+def _greenery_block_html() -> str:
+    """All three greeneries, because the customer may collect from any of them.
 
-
-def _sites_to_show(selected_yard_key: str | None) -> list[dict]:
-    """Under-5: only the yard chosen at checkout.
-
-    Over-5 uses the OCWR template instead, which lists all three and invites
-    the customer to choose any one. That open-choice path does not go through
-    this helper.
+    OCWR wants the choice left open for both self-load and crew-load orders, so
+    the yard bought at checkout is not binding. It still drives the region and
+    the Master Sheet row; it just does not limit where the customer may go.
     """
-    site = _selected_greenery(selected_yard_key)
-    return [site] if site else list(GREENERIES)
-
-
-def _greenery_block_html(selected_yard_key: str | None = None) -> str:
-    """Render the customer's greenery, or all three if the yard didn't resolve."""
     blocks = []
-    for site in _sites_to_show(selected_yard_key):
+    for site in GREENERIES:
         heading = html.escape(site["greenery"])
         if site.get("note"):
             heading += f" {html.escape(site['note'])}"
@@ -754,9 +781,9 @@ def _greenery_block_html(selected_yard_key: str | None = None) -> str:
     return "".join(blocks)
 
 
-def _greenery_block_text(selected_yard_key: str | None = None) -> str:
+def _greenery_block_text() -> str:
     lines = []
-    for site in _sites_to_show(selected_yard_key):
+    for site in GREENERIES:
         heading = site["greenery"]
         if site.get("note"):
             heading += f" {site['note']}"
@@ -816,11 +843,12 @@ def _ocwr_over5_greenery_block_text() -> str:
     return "\n".join(lines)
 
 
-def _appointment_location_clause(selected_yard_key: str | None) -> str:
-    """Tell the customer which location to book, rather than inviting a choice."""
-    site = _selected_greenery(selected_yard_key)
-    if site:
-        return f"be sure to select {site['greenery']}, the location you chose at checkout"
+def _appointment_location_clause() -> str:
+    """Invite the customer to pick a site, which is what OCWR wants.
+
+    The booking page asks for the service location anyway, so naming a single
+    yard here would contradict the page the link opens.
+    """
     return "be sure to select the preferred service location (Valencia, Capistrano or Bee Canyon)"
 
 
@@ -852,9 +880,9 @@ def _order_reference_html(order: "OrderPayload", material_phrase: str | None = N
 
 
 def build_pickup_self_load_email(order: "OrderPayload", yard: dict) -> tuple:
-    """Under 5 cubic yards: self-service pickup, scheduled via OCWR Bookings."""
+    """Under 5 cubic yards per material: self-service pickup, booked via OCWR."""
     material_phrase = describe_materials(order)
-    selected = yard.get("name")
+    _ = yard  # retained for call-site compatibility; the customer picks any site
 
     html_body = f"""<html><body style="{_BODY_STYLE}">
 <p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
@@ -865,7 +893,7 @@ and Recycling&rsquo;s Free Compost and Mulch Program.</p>
 your material.</p>
 <p style="margin:0 0 14px 0;"><strong>Use this
 <a href="{PICKUP_APPOINTMENT_URL}">LINK</a> to schedule an appointment to pick up your
-compost/mulch</strong> - {_appointment_location_clause(selected)}</p>
+compost/mulch</strong> - {_appointment_location_clause()}</p>
 <p style="margin:0 0 14px 0;">You will receive email confirmation when you submit your
 request with instructions on when, where, and how to pick up your compost/mulch.</p>
 <p style="margin:0 0 14px 0;"><strong>Please note that for any order under 5 yards, the
@@ -880,7 +908,7 @@ procurement for state mandated SB 1383 requirements.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
 Tips</a> website for details on the difference between compost and mulch and for tips on
 composting.</p>
-{_greenery_block_html(selected)}
+{_greenery_block_html()}
 {_footer_html()}
 </body></html>"""
 
@@ -895,7 +923,7 @@ Compost and Mulch Program.
 Please review the following pick-up instructions for your material.
 
 Use this link to schedule an appointment to pick up your compost/mulch -
-{textwrap.fill(_appointment_location_clause(selected), 76)}:
+{textwrap.fill(_appointment_location_clause(), 76)}:
 {PICKUP_APPOINTMENT_URL}
 
 You will receive email confirmation when you submit your request with
@@ -918,7 +946,7 @@ Visit Compost and Mulch Tips for details on the difference between compost and
 mulch and for tips on composting:
 {COMPOST_TIPS_URL}
 
-{_greenery_block_text(selected)}
+{_greenery_block_text()}
 {_footer_text()}"""
 
     subject = f"Your Agromin Order #{order.order_number} — Compost/Mulch Pick-Up Instructions"
@@ -928,10 +956,18 @@ mulch and for tips on composting:
 def build_pickup_staff_load_email(order: "OrderPayload", yard: dict) -> tuple:
     """5 cubic yards and over: greenery crew loads with heavy equipment.
 
-    Body copy follows OCWR's Over 5 Cubic Yard Email Template Updated 7.29.26.
+    Body copy follows OCWR's Over 5 Cubic Yard Email Template Updated 7.29.26,
+    with three deliberate departures:
+
     Map URLs stay the verified pairings in GREENERIES (the Word file rotates
     them). Tips link stays the clean oclandfills.com URL (the Word file wraps
-    it in Proofpoint). Greeting and order reference stay for automation.
+    it in Proofpoint). Coverage is 108 sq ft, not the template's 150: a cubic
+    yard is 27 cubic feet, and 27 over a quarter foot of depth is 108, so 150
+    would take 37.5 cubic feet and overstates coverage by 39%. Kendall chose
+    108 on 2026-08-04 and is confirming with OCWR; it also matches the figure
+    already in the delivery email, so the two no longer contradict.
+
+    Greeting and order reference stay for automation.
     """
     material_phrase = describe_materials(order)
     _ = yard  # retained for call-site compatibility; OCWR lists all three sites
@@ -956,7 +992,7 @@ present your email confirmation, and weigh in at the scales.</p>
 assistance. NO SELF-LOADING at the greenery.</p>
 <p style="margin:0 0 14px 0;">Upon exiting the landfill, your vehicle must be weighed
 before leaving the site.</p>
-<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers 150 Sq.
+<p style="margin:0 0 14px 0;">For your reference, 1 Cubic Yard of Compost covers 108 Sq.
 Feet at 3&quot; Layer/Depth. Most mid-sized pick-up trucks can hold &frac12; - 1 &frac12;
 Cubic Yards of Compost per load.</p>
 <p style="margin:0 0 14px 0;">Visit <a href="{COMPOST_TIPS_URL}">Compost and Mulch
@@ -995,7 +1031,7 @@ SELF-LOADING at the greenery.
 Upon exiting the landfill, your vehicle must be weighed before leaving the
 site.
 
-For your reference, 1 Cubic Yard of Compost covers 150 Sq. Feet at 3"
+For your reference, 1 Cubic Yard of Compost covers 108 Sq. Feet at 3"
 Layer/Depth. Most mid-sized pick-up trucks can hold 1/2 - 1 1/2 Cubic Yards of
 Compost per load.
 
@@ -1077,6 +1113,77 @@ Agromin"""
 
     subject = f"Your Agromin Delivery Request #{order.order_number} — Received"
     return subject, text_body, html_body
+
+
+def build_pickup_special_order_email(order: "OrderPayload") -> tuple:
+    """Holding note for a mixed order carrying 5 or more yards of one material.
+
+    Placeholder body. Kendall is writing the real template (2026-08-04); swap
+    the copy when it lands. It deliberately carries neither instruction set,
+    because both would be half wrong for this order: the large material
+    qualifies for crew loading, the remainder does not, and the crew-load email
+    forbids the self-loading the remainder needs.
+
+    The customer still gets something within seconds of checkout. Silence until
+    a human replies is what left the last batch of repliers with no answer.
+    """
+    material_phrase = describe_materials(order)
+
+    html_body = f"""<html><body style="{_BODY_STYLE}">
+<p style="margin:0 0 14px 0;">Hello {html.escape(order.customer_name or "")},</p>
+{_order_reference_html(order, material_phrase)}
+<p style="margin:0 0 14px 0;">Thank you for participating in the Orange County Waste and
+Recycling&rsquo;s Free Compost and Mulch Program.</p>
+<p style="margin:0 0 14px 0;">Your order combines a large quantity of one material with
+smaller quantities of another, so the pick-up arrangements depend on how you plan to
+transport it. We are reviewing your order and will contact you within one business day
+with instructions.</p>
+<p style="margin:0 0 14px 0;"><strong>Please wait to hear from us before travelling to a
+greenery.</strong></p>
+{_footer_html()}
+</body></html>"""
+
+    text_body = f"""Hello {order.customer_name},
+
+Order #{order.order_number}
+{material_phrase}
+
+Thank you for participating in the Orange County Waste and Recycling's Free
+Compost and Mulch Program.
+
+Your order combines a large quantity of one material with smaller quantities of
+another, so the pick-up arrangements depend on how you plan to transport it. We
+are reviewing your order and will contact you within one business day with
+instructions.
+
+Please wait to hear from us before travelling to a greenery.
+{_footer_text()}"""
+
+    subject = f"Your Agromin Order #{order.order_number} — We Are Reviewing Your Pick Up"
+    return subject, text_body, html_body
+
+
+SPECIAL_ORDER_ALERT_TEMPLATE = """\
+Special order received — action required.
+
+This order carries 5 or more cubic yards of a single material alongside another
+material. OCWR does not coordinate mixed loads, so it fits neither the
+self-load nor the crew-load path and needs a human decision: one visit with the
+crew loading the bulk material and the customer self-loading the rest, or two
+separate visits.
+
+Order #:          {order_number}
+Date:             {order_date}
+Customer:         {customer_name}
+Phone:            {customer_phone}
+Email:            {customer_email}
+Yard at checkout: {shipping_method}
+Materials:        {material_breakdown}
+Coupon Code:      {coupon_code}
+Order Comments:   {order_comments}
+
+The customer has been sent a holding note saying we will contact them within 1
+business day, and asking them not to travel to a greenery until we do."""
 
 
 DELIVERY_ALERT_TEMPLATE = """\
@@ -1412,7 +1519,9 @@ async def root():
 def _process_order(order: OrderPayload) -> dict:
     coupon_code = order.coupon_code.strip().upper()
     total_qty = sum(item.qty for item in order.line_items)
-    bulk_qty = bulk_cubic_yards(order)
+    bulk_by_material = bulk_yards_by_material(order)
+    bulk_qty = sum(bulk_by_material.values())
+    max_material_qty = max(bulk_by_material.values()) if bulk_by_material else 0.0
     material = order.line_items[0].description if order.line_items else "material"
     qty_str = format_qty(total_qty)
 
@@ -1420,7 +1529,7 @@ def _process_order(order: OrderPayload) -> dict:
         routing = "delivery"
         region = infer_region_from_address(order.shipping_address)
     else:
-        routing = "pickup_self_load" if bulk_qty < 5 else "pickup_staff_load"
+        routing = classify_pickup(order)
         yard = get_yard_for_order(order.shipping_method)
         region = yard.get("region", "unknown")
 
@@ -1439,6 +1548,8 @@ def _process_order(order: OrderPayload) -> dict:
                 "shipping_address": order.shipping_address,
                 "total_qty": total_qty,
                 "bulk_cubic_yards": bulk_qty,
+                "bulk_yards_by_material": bulk_by_material,
+                "max_material_cubic_yards": max_material_qty,
                 "material": material,
                 "order_date": order.order_date,
                 "customer_phone": order.customer_phone,
@@ -1492,6 +1603,8 @@ def _process_order(order: OrderPayload) -> dict:
         yard = get_yard_for_order(order.shipping_method)
         if routing == "pickup_self_load":
             subject, text_body, html_body = build_pickup_self_load_email(order, yard)
+        elif routing == "pickup_special_order":
+            subject, text_body, html_body = build_pickup_special_order_email(order)
         else:
             subject, text_body, html_body = build_pickup_staff_load_email(order, yard)
         customer_email_sent = send_email(
@@ -1503,6 +1616,22 @@ def _process_order(order: OrderPayload) -> dict:
             html_body=html_body,
             reply_to=reply_to,
         )
+
+        if routing == "pickup_special_order":
+            alert_body = SPECIAL_ORDER_ALERT_TEMPLATE.format(
+                order_number=order.order_number,
+                order_date=order.order_date,
+                customer_name=order.customer_name,
+                customer_phone=order.customer_phone,
+                customer_email=order.customer_email,
+                shipping_method=order.shipping_method,
+                material_breakdown=describe_materials(order),
+                coupon_code=coupon_code,
+                order_comments=order.order_comments or "(none)",
+            )
+            alert_subject = f"Special Order #{order.order_number} — Action Required"
+            for recipient in SPECIAL_ORDER_ALERT_TO:
+                send_email(recipient, alert_subject, alert_body)
 
     # Record whether the customer email actually left the building. Without this
     # a Graph rejection is invisible after the fact and "I never got the email"
