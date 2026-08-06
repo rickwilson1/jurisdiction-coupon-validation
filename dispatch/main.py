@@ -1118,14 +1118,17 @@ Agromin"""
 def build_pickup_special_order_email(order: "OrderPayload") -> tuple:
     """Holding note for a mixed order carrying 5 or more yards of one material.
 
-    Placeholder body. Kendall is writing the real template (2026-08-04); swap
-    the copy when it lands. It deliberately carries neither instruction set,
-    because both would be half wrong for this order: the large material
-    qualifies for crew loading, the remainder does not, and the crew-load email
-    forbids the self-loading the remainder needs.
+    Body copy is Kendall's Email Template Order Received - Review in Progress
+    (2026-08-06). Additions on top of it: the customer's name on the greeting,
+    the order reference line, and the standard footer, all matching the other
+    three templates, plus one sentence naming why the order is held. Kendall's
+    draft gave no reason; Rick chose to state it so the customer is not left
+    guessing why an order that went through checkout is now paused.
 
-    The customer still gets something within seconds of checkout. Silence until
-    a human replies is what left the last batch of repliers with no answer.
+    It deliberately carries neither set of pickup instructions, because both
+    would be half wrong here: the large material qualifies for crew loading,
+    the remainder does not, and the crew-load copy forbids the self-loading the
+    remainder needs.
     """
     material_phrase = describe_materials(order)
 
@@ -1134,12 +1137,16 @@ def build_pickup_special_order_email(order: "OrderPayload") -> tuple:
 {_order_reference_html(order, material_phrase)}
 <p style="margin:0 0 14px 0;">Thank you for participating in the Orange County Waste and
 Recycling&rsquo;s Free Compost and Mulch Program.</p>
-<p style="margin:0 0 14px 0;">Your order combines a large quantity of one material with
-smaller quantities of another, so the pick-up arrangements depend on how you plan to
-transport it. We are reviewing your order and will contact you within one business day
-with instructions.</p>
-<p style="margin:0 0 14px 0;"><strong>Please wait to hear from us before travelling to a
-greenery.</strong></p>
+<p style="margin:0 0 14px 0;">Your request has been received and is currently under
+review. Your order combines a large quantity of one material with smaller quantities of
+another, so the pick-up arrangements depend on how you plan to transport it. A member of
+our team will contact you within <strong>one business day</strong> with information about
+your order and next steps.</p>
+<p style="margin:0 0 14px 0;"><strong>Please do not visit a Greenery location until you
+receive confirmation from our team.</strong> Material availability and pickup instructions
+must be verified before your order can be fulfilled.</p>
+<p style="margin:0 0 14px 0;">Thank you for your patience, and we will be in touch
+soon.</p>
 {_footer_html()}
 </body></html>"""
 
@@ -1151,15 +1158,20 @@ Order #{order.order_number}
 Thank you for participating in the Orange County Waste and Recycling's Free
 Compost and Mulch Program.
 
-Your order combines a large quantity of one material with smaller quantities of
-another, so the pick-up arrangements depend on how you plan to transport it. We
-are reviewing your order and will contact you within one business day with
-instructions.
+Your request has been received and is currently under review. Your order
+combines a large quantity of one material with smaller quantities of another, so
+the pick-up arrangements depend on how you plan to transport it. A member of our
+team will contact you within one business day with information about your order
+and next steps.
 
-Please wait to hear from us before travelling to a greenery.
+Please do not visit a Greenery location until you receive confirmation from our
+team. Material availability and pickup instructions must be verified before your
+order can be fulfilled.
+
+Thank you for your patience, and we will be in touch soon.
 {_footer_text()}"""
 
-    subject = f"Your Agromin Order #{order.order_number} — We Are Reviewing Your Pick Up"
+    subject = f"Your Agromin Order #{order.order_number} — Order Received, Review in Progress"
     return subject, text_body, html_body
 
 
