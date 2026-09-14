@@ -58,7 +58,19 @@ DEFAULT_RECIPIENTS = [
 # Override with WEEKLY_REPORT_EXCLUDE (comma-separated order numbers).
 DEFAULT_EXCLUDED_ORDERS = {"A1"}
 
+# OCWR program launch (Rick, 2026-09-14). Orders dated earlier are soft-launch
+# or test activity: they appear as a single pre-launch row in the monthly table
+# and nowhere else. Override with WEEKLY_REPORT_PROGRAM_START (YYYY-MM-DD).
+DEFAULT_PROGRAM_START = date(2026, 8, 28)
+
+# This report covers the OCWR program only. Ventura and Sacramento orders land
+# in the same Firestore collection with their own `region` value and must stay
+# out. Override with WEEKLY_REPORT_REGION; set it to an empty string for all.
+DEFAULT_REGION = "oc"
+PROGRAM_NAME = "OCWR"
+
 # Trailing weeks shown in the weekly table (the report week is the last row).
+# The table never reaches back before the launch week.
 WEEKS_BACK = 8
 
 # Fallback when the coupon master is unreachable. Keyed by the abbreviation
@@ -100,6 +112,21 @@ def excluded_orders_from_env() -> set[str]:
     if raw is None:
         return set(DEFAULT_EXCLUDED_ORDERS)
     return {e.strip().upper() for e in raw.split(",") if e.strip()}
+
+
+def program_start_from_env() -> date:
+    raw = os.environ.get("WEEKLY_REPORT_PROGRAM_START")
+    if not raw:
+        return DEFAULT_PROGRAM_START
+    return date.fromisoformat(raw.strip())
+
+
+def region_from_env() -> str | None:
+    """Region filter; None means no filter."""
+    raw = os.environ.get("WEEKLY_REPORT_REGION")
+    if raw is None:
+        return DEFAULT_REGION
+    return raw.strip().lower() or None
 
 
 # ---------------------------------------------------
@@ -242,18 +269,26 @@ def normalize_events(
     docs: list[dict],
     jurisdiction_map: dict[str, str] | None = None,
     excluded: set[str] | None = None,
+    region: str | None = "",
 ) -> list[ReportOrder]:
     """Turn Firestore `order_events` dicts into ReportOrder rows.
 
     Order date comes from the CIMcloud `order_date` string; when that is
     missing or unparseable the Pacific calendar date of `processed_at` is used.
-    Documents with neither are dropped with a warning.
+    Documents with neither are dropped with a warning. `region` keeps only
+    documents whose `region` field matches (case-insensitive); pass None for
+    no filter. The default sentinel "" resolves from the environment.
     """
     excluded = excluded if excluded is not None else excluded_orders_from_env()
+    if region == "":
+        region = region_from_env()
+    region = region.strip().lower() if region else None
     out = []
     for d in docs:
         number = str(d.get("order_number") or "").strip()
         if not number or number.upper() in excluded:
+            continue
+        if region and str(d.get("region") or "").strip().lower() != region:
             continue
         order_date = parse_order_date(d.get("order_date")) or _to_pacific_date(
             d.get("processed_at")
@@ -341,6 +376,8 @@ class WeeklyReport:
     by_material: list[Bucket]
     by_yard: list[Bucket]
     to_date: Bucket
+    pre_launch: Bucket
+    program_start: date
     week_orders: list[ReportOrder]
     all_orders: list[ReportOrder]
     financials_available: bool
@@ -366,9 +403,18 @@ def build_report(
     generated_at: datetime | None = None,
     weeks_back: int = WEEKS_BACK,
     jurisdiction_source: str = "coupon master",
+    program_start: date | None = None,
 ) -> WeeklyReport:
     generated_at = generated_at or datetime.now(PACIFIC_TZ)
+    program_start = program_start or program_start_from_env()
     orders = [o for o in orders if o.order_date <= week_end]
+
+    # Everything before launch collapses into one bucket for the monthly table.
+    pre_launch = Bucket(f"Pre-launch (before {program_start:%b %-d})")
+    for o in orders:
+        if o.order_date < program_start:
+            pre_launch.add(o)
+    orders = [o for o in orders if o.order_date >= program_start]
 
     week_orders = [o for o in orders if week_start <= o.order_date <= week_end]
     week = Bucket(_week_label(week_start))
@@ -381,9 +427,12 @@ def build_report(
         if prior_start <= o.order_date < week_start:
             prior.add(o)
 
+    launch_week = program_start - timedelta(days=program_start.weekday())
     weekly = []
     for i in range(weeks_back - 1, -1, -1):
         ws = week_start - timedelta(days=7 * i)
+        if ws < launch_week:
+            continue
         b = Bucket(_week_label(ws))
         for o in orders:
             if o.week_start == ws:
@@ -396,8 +445,8 @@ def build_report(
     by_jurisdiction = sorted(by_jur.values(), key=lambda b: (-b.orders, -b.cubic_yards, b.label))
 
     monthly: list[Bucket] = []
-    if orders:
-        y, m = orders[0].month
+    if program_start <= week_end:
+        y, m = program_start.year, program_start.month
         end_y, end_m = week_end.year, week_end.month
         while (y, m) <= (end_y, end_m):
             b = Bucket(_month_label(y, m))
@@ -436,6 +485,8 @@ def build_report(
         by_material=by_material,
         by_yard=by_yard,
         to_date=to_date,
+        pre_launch=pre_launch,
+        program_start=program_start,
         week_orders=week_orders,
         all_orders=orders,
         financials_available=any(o.coupon_amount for o in orders),
@@ -466,7 +517,7 @@ def _range_label(start: date, end: date) -> str:
 
 def subject_line(r: WeeklyReport) -> str:
     return (
-        f"Coupon Activity, Week of {_range_label(r.week_start, r.week_end)}: "
+        f"{PROGRAM_NAME} Coupon Activity, Week of {_range_label(r.week_start, r.week_end)}: "
         f"{r.week.orders} order{'s' if r.week.orders != 1 else ''}, "
         f"{format_qty(r.week.cubic_yards)} CY; "
         f"{r.to_date.orders} orders / {format_qty(r.to_date.cubic_yards)} CY to date"
@@ -499,9 +550,9 @@ def _summary_sentences(r: WeeklyReport) -> list[str]:
     else:
         delta = f"down from {p.orders} order{'s' if p.orders != 1 else ''} and {format_qty(p.cubic_yards)} CY in"
     second = f"That is {delta} the prior week."
-    since = f" since {r.first_order_date:%B %-d, %Y}" if r.first_order_date else ""
     third = (
-        f"Program to date: {t.orders} orders and {format_qty(t.cubic_yards)} cubic yards{since}; "
+        f"Program to date (launched {r.program_start:%B %-d, %Y}): {t.orders} orders and "
+        f"{format_qty(t.cubic_yards)} cubic yards; "
         f"{t.self_load} self-load, {t.staff_load} staff-load, {t.delivery} delivery; "
         f"{len(r.by_jurisdiction)} jurisdiction{'s' if len(r.by_jurisdiction) != 1 else ''} active."
     )
@@ -612,6 +663,11 @@ def _jurisdiction_rows(r: WeeklyReport) -> tuple[list[str], list[list], set[int]
 def _monthly_rows(r: WeeklyReport) -> tuple[list[str], list[list], set[int], list]:
     headers = ["Month", "Orders", "CY", "Self-load", "Staff-load", "Delivery"]
     rows = []
+    if r.pre_launch.orders:
+        p = r.pre_launch
+        rows.append(
+            [p.label, p.orders, format_qty(p.cubic_yards), p.self_load, p.staff_load, p.delivery]
+        )
     for b in r.monthly:
         label = b.label
         if (r.week_end.year, r.week_end.month) == _month_key(b.label) and r.week_end.day < 28:
@@ -639,7 +695,7 @@ def _month_key(label: str) -> tuple[int, int]:
 def render_html(r: WeeklyReport) -> str:
     parts = [
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width"><title>Coupon Activity</title></head>'
+        f'<meta name="viewport" content="width=device-width"><title>{PROGRAM_NAME} Coupon Activity</title></head>'
         '<body style="margin:0;padding:0;background:#ffffff;">'
         '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
         '<tr><td align="center" style="padding:16px 8px;">'
@@ -649,7 +705,7 @@ def render_html(r: WeeklyReport) -> str:
     ]
     parts.append(
         f'<p style="{_FONT}font-size:15pt;font-weight:bold;color:#2e5e3a;margin:0 0 4px 0;">'
-        f"Coupon Program Activity</p>"
+        f"{PROGRAM_NAME} Coupon Program Activity</p>"
         f'<p style="{_FONT}font-size:10pt;color:#666;margin:0 0 14px 0;">'
         f"Week of {html.escape(_range_label(r.week_start, r.week_end))} &middot; "
         f"generated {r.generated_at:%A, %B %-d, %Y %-I:%M %p} PT</p>"
@@ -722,7 +778,7 @@ def _text_table(headers: list[str], rows: list[list], total: list | None = None)
 
 def render_text(r: WeeklyReport) -> str:
     out = [
-        "COUPON PROGRAM ACTIVITY",
+        f"{PROGRAM_NAME} COUPON PROGRAM ACTIVITY",
         f"Week of {_range_label(r.week_start, r.week_end)}; generated "
         f"{r.generated_at:%A, %B %-d, %Y %-I:%M %p} PT",
         "",

@@ -40,18 +40,32 @@ All non-health endpoints require `X-API-Key` header matching
 
 ## Weekly coupon activity report
 
-`weekly_report.py` builds the Monday-morning summary from Firestore
-`order_events`: the prior Monday-to-Sunday week, a trailing eight-week series,
-program-to-date by jurisdiction, a monthly rollup, and material/site splits.
-The email body is table-layout HTML with inline CSS (Outlook-safe) plus a
-plain-text alternative, and an `.xlsx` with order-level detail is attached.
-The attachment carries customer contact fields; recipients are internal only.
+`weekly_report.py` builds the Monday-morning OCWR summary from Firestore
+`order_events`: the prior Monday-to-Sunday week, a trailing series of up to
+eight weeks (never reaching back before the launch week), program-to-date by
+jurisdiction, a monthly rollup, and material/site splits. The email body is
+table-layout HTML with inline CSS (Outlook-safe) plus a plain-text
+alternative, and an `.xlsx` with order-level detail is attached. The
+attachment carries customer contact fields; recipients are internal only.
+
+Scope rules:
+
+- **OCWR only.** Documents whose `region` is not `oc` are dropped
+  (`WEEKLY_REPORT_REGION`; set to an empty string to include all regions).
+- **Launch anchor.** The OCWR program launched 2026-08-28. Orders dated
+  earlier are soft-launch or test activity: they collapse into one
+  "Pre-launch (before Aug 28)" row in the monthly table and appear nowhere
+  else, including the attachment (`WEEKLY_REPORT_PROGRAM_START`).
+- **Test orders.** Order numbers in `WEEKLY_REPORT_EXCLUDE` (default `A1`)
+  are dropped entirely.
 
 Orders are dated by the CIMcloud order date (Pacific `processed_at` date as
-fallback). Test orders listed in `WEEKLY_REPORT_EXCLUDE` (default `A1`) are
-dropped. Jurisdiction names come from `coupons.xlsx` in the
+fallback). Jurisdiction names come from `coupons.xlsx` in the
 `agromin-coupon-data` bucket; if that read fails the code abbreviation table
-in `weekly_report.py` is used and the email says so in its notes.
+in `weekly_report.py` is used (the `send=false` JSON reports which).
+The coupon-value column appears in the jurisdiction table once any order in
+scope carries a `coupon_amount`, which `_process_order` persists for orders
+ingested after the 2026-09-14 deploy.
 
 Query parameters on `GET /api/weekly-coupon-report`:
 
@@ -105,6 +119,8 @@ is scoped via Exchange RBAC to send only as `dispatch@agromin.com`.
 | `CONFIRMATION_BCC` | No | Comma-separated internal BCC on every customer confirmation. Defaults to `KENDALL_EMAIL`. Set to an empty string to disable. |
 | `WEEKLY_REPORT_TO` | No | Comma-separated recipients of the Monday coupon report. Defaults to the 13-address internal list in `weekly_report.py`. |
 | `WEEKLY_REPORT_EXCLUDE` | No | Comma-separated order numbers to drop from the report as test orders. Defaults to `A1`. |
+| `WEEKLY_REPORT_PROGRAM_START` | No | ISO date; orders before it are shown only as a pre-launch row. Defaults to `2026-08-28`. |
+| `WEEKLY_REPORT_REGION` | No | Firestore `region` value to include. Defaults to `oc`; empty string means all regions. |
 
 If Graph creds are unset, email sending is skipped with a warning log
 (useful for local development).

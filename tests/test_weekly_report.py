@@ -121,10 +121,26 @@ check("legacy Irvine code", wr.jurisdiction_for("IRVINECOM26"), "Irvine")
 check("Sacramento bag code", wr.jurisdiction_for("CITYSACCOMB26"), "Sacramento")
 check("unknown returns the code", wr.jurisdiction_for("CITYZZZCOM26"), "CITYZZZCOM26")
 
+VENTURA = doc("A200", "9/9/2026 9:00:00 AM PT", "CITYVCOM26", "delivery", 5.0, region="ventura")
+
 print("\nnormalize_events")
-orders = wr.normalize_events(DOCS, None, excluded={"A1"})
+orders = wr.normalize_events(DOCS + [VENTURA], None, excluded={"A1"})
 check("test order excluded", "A1" in {o.order_number for o in orders}, False)
+check("default region filter drops Ventura", "A200" in {o.order_number for o in orders}, False)
 check("count", len(orders), 9)
+check(
+    "region=None keeps everything",
+    len(wr.normalize_events(DOCS + [VENTURA], None, excluded={"A1"}, region=None)),
+    10,
+)
+check(
+    "explicit region match is case-insensitive",
+    [
+        o.order_number
+        for o in wr.normalize_events([VENTURA], None, excluded=set(), region="VENTURA")
+    ],
+    ["A200"],
+)
 check(
     "processed_at fallback lands on Pacific date",
     next(o for o in orders if o.order_number == "A107").order_date,
@@ -136,47 +152,66 @@ print("\nbuild_report")
 r = wr.build_report(
     orders, date(2026, 9, 7), date(2026, 9, 13), generated_at=datetime(2026, 9, 14, 7, 0)
 )
+check("program start defaults to launch", r.program_start, date(2026, 8, 28))
 check("week orders", r.week.orders, 1)
 check("week CY", r.week.cubic_yards, 2.0)
 check("week jurisdictions", r.week.jurisdictions, ["Newport Beach"])
 check("prior week orders", r.prior_week.orders, 4)
 check("prior week CY", r.prior_week.cubic_yards, 7.0)
-check("future order excluded from to-date", r.to_date.orders, 8)
-check("to-date CY", r.to_date.cubic_yards, 20.5)
-check("to-date routing", (r.to_date.self_load, r.to_date.staff_load, r.to_date.delivery), (5, 2, 1))
-check("eight weekly buckets", len(r.weekly), 8)
-check("last weekly bucket is the report week", r.weekly[-1].label, "Sep 7 to 13")
-check("weekly labels cross month", r.weekly[-2].label, "Aug 31 to Sep 6")
 check(
-    "jurisdiction order (orders desc, CY desc)",
-    [b.label for b in r.by_jurisdiction][:3],
-    ["Irvine", "Anaheim", "San Clemente"],
+    "pre-launch bucket (A106, A100, A101)",
+    (r.pre_launch.orders, r.pre_launch.cubic_yards),
+    (3, 11.5),
 )
+check("pre-launch label", r.pre_launch.label, "Pre-launch (before Aug 28)")
+check("to-date excludes pre-launch and future", r.to_date.orders, 5)
+check("to-date CY", r.to_date.cubic_yards, 9.0)
+check("to-date routing", (r.to_date.self_load, r.to_date.staff_load, r.to_date.delivery), (4, 1, 0))
+check(
+    "weekly table starts at launch week",
+    [b.label for b in r.weekly],
+    ["Aug 24 to 30", "Aug 31 to Sep 6", "Sep 7 to 13"],
+)
+check("launch week shows only post-launch orders", r.weekly[0].orders, 0)
+check(
+    "jurisdiction order (orders desc, CY desc, name)",
+    [b.label for b in r.by_jurisdiction],
+    ["San Clemente", "Newport Beach", "Irvine", "Buena Park", "Placentia"],
+)
+check("pre-launch jurisdictions absent", "Anaheim" in [b.label for b in r.by_jurisdiction], False)
+check(
+    "monthly spans launch month to report month",
+    [b.label for b in r.monthly],
+    ["August 2026", "September 2026"],
+)
+check("August counts launch-onward only", (r.monthly[0].orders, r.monthly[0].cubic_yards), (2, 1.0))
+check("material groups", [(b.label, b.cubic_yards) for b in r.by_material], [("Compost", 9.0)])
+check("financials flagged unavailable", r.financials_available, False)
+check("first order date", r.first_order_date, date(2026, 8, 31))
+
+print("\nbuild_report with explicit program_start")
+r_all = wr.build_report(
+    orders,
+    date(2026, 9, 7),
+    date(2026, 9, 13),
+    generated_at=datetime(2026, 9, 14, 7, 0),
+    program_start=date(2026, 1, 1),
+)
+check("no pre-launch when start precedes data", r_all.pre_launch.orders, 0)
+check("to-date includes everything", r_all.to_date.orders, 8)
+check("eight weekly buckets when launch is old", len(r_all.weekly), 8)
 check(
     "Irvine groups legacy and new code",
-    next(b for b in r.by_jurisdiction if b.label == "Irvine").codes,
+    next(b for b in r_all.by_jurisdiction if b.label == "Irvine").codes,
     ["IRVINECOM26", "CITYIRVCOM26"],
 )
-check(
-    "monthly spans first order to report month",
-    [b.label for b in r.monthly],
-    ["May 2026", "June 2026", "July 2026", "August 2026", "September 2026"],
-)
-check("June is a zero month", r.monthly[1].orders, 0)
-check(
-    "material groups",
-    [(b.label, b.cubic_yards) for b in r.by_material],
-    [("Compost", 12.5), ("Cover mulch", 8.0)],
-)
-check("financials flagged unavailable", r.financials_available, False)
-check("first order date", r.first_order_date, date(2026, 5, 4))
 
 print("\nrendering")
 subj = wr.subject_line(r)
 check(
     "subject",
     subj,
-    "Coupon Activity, Week of September 7 to 13, 2026: 1 order, 2 CY; 8 orders / 20.5 CY to date",
+    "OCWR Coupon Activity, Week of September 7 to 13, 2026: 1 order, 2 CY; 5 orders / 9 CY to date",
 )
 html_body = wr.render_html(r)
 check(
@@ -188,6 +223,10 @@ check(
 )
 check("html has week table", "This week" in html_body, True)
 check("html has jurisdiction total row", ">Total<" in html_body, True)
+check("html titled OCWR", "OCWR Coupon Program Activity" in html_body, True)
+check("html has pre-launch row", "Pre-launch (before Aug 28)" in html_body, True)
+check("html states launch date", "launched August 28, 2026" in html_body, True)
+check("html has no pre-launch row when none", "Pre-launch" in wr.render_html(r_all), False)
 check("html has no notes section", "Notes</p>" in html_body, False)
 check("html uses inline font stack", "font-family:Aptos" in html_body, True)
 check("html has no external css", "<link" in html_body or "<style" in html_body, False)
@@ -207,7 +246,10 @@ check(
     "No coupon orders were recorded for August 3 to 9, 2026.",
 )
 check("zero-week html renders", "No coupon orders" in wr.render_html(r0), True)
-check("zero-week to-date only counts through week end", r0.to_date.orders, 1)
+check("week before launch has empty to-date", r0.to_date.orders, 0)
+check("week before launch still buckets pre-launch through week end", r0.pre_launch.orders, 1)
+check("no monthly rows before launch", r0.monthly, [])
+check("no weekly rows before launch", r0.weekly, [])
 
 print("\nxlsx")
 data = wr.build_xlsx(r)
@@ -218,7 +260,7 @@ check(
     ["Week orders", "All orders", "Weekly", "By jurisdiction", "Monthly", "Material and site"],
 )
 ws = wb["All orders"]
-check("all orders rows", ws.max_row - 1, 8)
+check("all orders rows (launch onward)", ws.max_row - 1, 5)
 check("all orders carries customer email column", "Email" in [c.value for c in ws[1]], True)
 check("header font Aptos", ws["A1"].font.name, "Aptos")
 check("body font Aptos 11", (ws["A2"].font.name, ws["A2"].font.size), ("Aptos", 11.0))
@@ -236,6 +278,15 @@ check("default recipient count", len(wr.recipients_from_env()), 13)
 os.environ["WEEKLY_REPORT_TO"] = "a@agromin.com, b@agromin.com,"
 check("env override", wr.recipients_from_env(), ["a@agromin.com", "b@agromin.com"])
 os.environ.pop("WEEKLY_REPORT_TO", None)
+os.environ["WEEKLY_REPORT_PROGRAM_START"] = "2026-09-01"
+check("program start env override", wr.program_start_from_env(), date(2026, 9, 1))
+os.environ.pop("WEEKLY_REPORT_PROGRAM_START", None)
+check("program start default", wr.program_start_from_env(), date(2026, 8, 28))
+os.environ.pop("WEEKLY_REPORT_REGION", None)
+check("region default", wr.region_from_env(), "oc")
+os.environ["WEEKLY_REPORT_REGION"] = ""
+check("empty region env means no filter", wr.region_from_env(), None)
+os.environ.pop("WEEKLY_REPORT_REGION", None)
 os.environ["WEEKLY_REPORT_EXCLUDE"] = "a1,T9"
 check("exclude env uppercases", wr.excluded_orders_from_env(), {"A1", "T9"})
 os.environ.pop("WEEKLY_REPORT_EXCLUDE", None)

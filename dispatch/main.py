@@ -1590,6 +1590,14 @@ def _process_order(order: OrderPayload) -> dict:
                 "material": material,
                 "order_date": order.order_date,
                 "customer_phone": order.customer_phone,
+                # Order-summary financials from the CIMcloud email. coupon_amount
+                # is the reimbursement basis the weekly report and OCWR billing
+                # key off; the rest give the accountants the full picture.
+                "subtotal": order.subtotal,
+                "tax": order.tax,
+                "shipping": order.shipping,
+                "coupon_amount": order.coupon_amount,
+                "order_total": order.order_total,
                 "status": "success",
             }
         )
@@ -1959,7 +1967,7 @@ def _build_weekly_report(week_ending: str | None) -> weekly_report.WeeklyReport:
 
     jurisdictions = weekly_report.load_jurisdiction_map()
     docs = [doc.to_dict() for doc in get_firestore().collection("order_events").stream()]
-    orders = weekly_report.normalize_events(docs, jurisdictions)
+    orders = weekly_report.normalize_events(docs, jurisdictions)  # region from env, default oc
     return weekly_report.build_report(
         orders,
         week_start,
@@ -2004,6 +2012,8 @@ async def weekly_coupon_report(
         "week_cubic_yards": report.week.cubic_yards,
         "to_date_orders": report.to_date.orders,
         "to_date_cubic_yards": report.to_date.cubic_yards,
+        "program_start": report.program_start.isoformat(),
+        "pre_launch_orders": report.pre_launch.orders,
         "recipients": recipients,
         "jurisdiction_source": report.jurisdiction_source,
         "sent": False,
