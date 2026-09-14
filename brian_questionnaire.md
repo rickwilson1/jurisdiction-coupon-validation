@@ -1,4 +1,4 @@
-# Delivery Operations — Quick Questions for Brian
+# Phase 2: Scheduling — Quick Questions for Brian
 **From:** Rick Wilson  
 **Takes about:** 15 minutes  
 **Why:** Before we build the scheduling tool, I want to make sure it fits how you actually work — not how I imagine you work.
@@ -29,7 +29,7 @@ Feel free to answer in whatever format is easiest — bullet points, sentences, 
 
 8. Would customers be okay receiving an email or text to pick a delivery window, or do they expect a personal phone call?
 
-9. After you confirm a date with a customer, how do you notify them — phone call, email, both? Would you want the system to send an automatic confirmation email at that point, or would you handle that yourself?
+9. After you confirm a date with a customer, how do you notify them — phone call, email, both? When the scheduling tool is live, should it send the customer a confirmation email automatically the moment you click confirm — or would you want to review it before it goes out?
 
 ---
 
@@ -43,51 +43,57 @@ Feel free to answer in whatever format is easiest — bullet points, sentences, 
 
 13. Are your haulers Agromin employees or contractors? What information does the driver need to complete the delivery?
 
+14. When you're looking at a list of pending delivery orders, how would you want them sorted or prioritized — oldest order first, by zip code / delivery area, by quantity, or something else?
+
 ---
 
 ## After delivery
 
-14. After a delivery is made, what do you do to close it out? Is there anything you log, submit to OCWR, or send to Ofelia confirming it happened?
+15. After a delivery is made, what do you do to close it out? Is there anything you log, submit to OCWR, or send to Ofelia confirming it happened?
 
-15. Is there an OCWR representative or inspector present at the delivery site? Does anyone from OCWR physically sign off on the delivery?
+16. Is there an OCWR representative or inspector present at the delivery site? Does anyone from OCWR physically sign off on the delivery?
 
-16. How often do deliveries get rescheduled after they're confirmed? When that happens, who initiates it — you or the customer — and what do you do?
+17. How often do deliveries get rescheduled after they're confirmed? When that happens, who initiates it — you or the customer — and what do you do?
 
-17. Do customers ever cancel a confirmed delivery? How often, and what do you do when it happens?
+18. Do customers ever cancel a confirmed delivery? How often, and what do you do when it happens?
 
-18. When you record a confirmed delivery in your workbook or schedule, what information do you write down? Walk me through a typical entry.
+19. When you record a confirmed delivery in your workbook or schedule, what information do you write down? Walk me through a typical entry.
 
 ---
 
 ## The Greenery Log
 
-19. What is the Greenery Log — is it a spreadsheet, a paper form, or something else? Where does it live?
+20. What is the Greenery Log — is it a spreadsheet, a paper form, or something else? Where does it live, and who has access to it?
 
-20. Can you walk me through what gets recorded for each entry? What fields or information does a single row contain?
+21. Can you walk me through what gets recorded for each entry? What fields or information does a single row contain?
 
-21. Who fills it in — you, yard staff, someone else?
+22. Who fills it in — you, yard staff, someone else? Is there a specific yard manager at each site who owns this?
 
-22. Does OCWR require it in a specific format? Do you submit it to them on a regular schedule?
+23. Does OCWR require it in a specific format? Do you submit it to them on a regular schedule?
 
-23. Do the yard staff at each site have a tablet or computer available at the gate, or is it paper-based at the point of loading?
+24. Do the yard staff at each site have a tablet or computer available at the gate, or is it paper-based at the point of loading?
+
+25. Could you attach or forward a copy of the Greenery Log (or even a screenshot of a few rows)? Seeing the real thing is much faster than describing it — it'll make sure we don't miss any columns when we build the replacement.
 
 ---
 
 ## Notifications and system setup
 
-24. When a new delivery order comes in, who currently gets notified — is that you, or does someone named Greg handle deliveries? (We want to make sure the right person gets the alert.)
+26. When a new delivery order comes in, who currently gets notified? Our plan is to send the alert to you, Greg, and Kendall. Is that right, or should someone be added or removed?
+
+27. When you're working delivery orders day-to-day, are you primarily at a desk on a computer, or are you on a phone or tablet in the field? (This affects how we design the scheduling page.)
 
 ---
 
 ## The most important question
 
-25. If you could change one thing about how delivery orders are handled today, what would it be?
+28. If you could change one thing about how delivery orders are handled today, what would it be?
 
 ---
 
 ## Anyone else I should talk to?
 
-26. Is there anyone else — a yard manager, hauler, or someone at OCWR — I should speak with before we build this?
+29. Is there anyone else — a yard manager, hauler, or someone at OCWR — I should speak with before we build this?
 
 ---
 
