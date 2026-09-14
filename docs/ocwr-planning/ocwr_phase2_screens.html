@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OCWR × Agromin — Phase 2 Screen Mockups</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #f5f5f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #2c3e2d;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .stage {
+    width: 100%;
+    max-width: 1400px;
+    aspect-ratio: 16 / 9;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 22px 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .future-tag {
+    position: absolute;
+    top: 16px;
+    right: 22px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #fff;
+    background: #639922;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  header {
+    border-bottom: 2px solid #639922;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  header .eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #639922;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  header h1 {
+    font-size: 20px;
+    color: #4a6b3a;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  header p {
+    font-size: 11.5px;
+    color: #6c7a6d;
+    margin-top: 2px;
+  }
+
+  /* Grid of 4 screens */
+  .screens {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .screen {
+    background: #fff;
+    border: 1.5px solid #d6d8c7;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .screen.greg { border-color: #e0a86b; }
+  .screen.ofelia { border-color: #a89dc7; }
+  .screen.yard { border-color: #7bb38a; }
+  .screen.kendall { border-color: #d49770; }
+
+  .browser-bar {
+    background: #ebebe2;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid #d6d8c7;
+  }
+  .traffic { display: flex; gap: 4px; }
+  .traffic span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #c8c8c0;
+  }
+  .url {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #d6d8c7;
+    border-radius: 4px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 9.5px;
+    color: #5a6359;
+    padding: 2px 8px;
+    text-align: center;
+  }
+
+  .screen-header {
+    padding: 8px 14px;
+    border-bottom: 1px solid #ecede5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .screen-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #2c3e2d;
+  }
+  .who-tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 8px;
+  }
+  .greg .who-tag { background: #fdf2e3; color: #b8732a; border: 1px solid #e0a86b; }
+  .ofelia .who-tag { background: #f0eef7; color: #5a4a8e; border: 1px solid #a89dc7; }
+  .yard .who-tag { background: #ecf5ee; color: #3b6d11; border: 1px solid #7bb38a; }
+  .kendall .who-tag { background: #fdf2e3; color: #b8732a; border: 1px solid #e0a86b; }
+
+  .screen-body {
+    flex: 1;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  /* Queue rows (Greg) */
+  .queue-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #ecede5;
+    border-radius: 6px;
+    background: #fafaf3;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-pending { background: #e0a86b; }
+  .dot-called { background: #6b8acc; }
+  .dot-scheduled { background: #639922; }
+  .row-info { flex: 1; min-width: 0; }
+  .row-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #2c3e2d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-meta {
+    font-size: 10px;
+    color: #8a9388;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-action {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+  .action-schedule { background: #f3f7ed; color: #3b6d11; border-color: #a3c178; }
+  .action-view { background: #f5f5f0; color: #6c7a6d; border-color: #c8c8c0; }
+
+  /* Schedule items (Ofelia) */
+  .week-label {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 9.5px;
+    color: #8a9388;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .sched-row {
+    display: flex;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #f0eef7;
+    border: 1px solid #d4cce5;
+    align-items: flex-start;
+  }
+  .sched-row.tbd { background: #fdf7ee; border-color: #e8c89a; }
+  .sched-date {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: #5a4a8e;
+    min-width: 56px;
+    padding-top: 1px;
+  }
+  .sched-row.tbd .sched-date { color: #b8732a; }
+  .sched-info { flex: 1; min-width: 0; }
+
+  /* Yard form */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+  }
+  .form-grid.full { grid-template-columns: 1fr; }
+  .field-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8a9388;
+    margin-bottom: 1px;
+  }
+  .field-input {
+    background: #fafaf3;
+    border: 1px solid #d6d8c7;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #5a6359;
+    font-style: italic;
+  }
+  .field-input.filled {
+    color: #2c3e2d;
+    font-style: normal;
+    background: #f3f7ed;
+    border-color: #a3c178;
+  }
+  .submit-btn {
+    margin-top: 6px;
+    background: #639922;
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    align-self: flex-start;
+  }
+
+  /* Kendall reports */
+  .stat-row {
+    display: flex;
+    gap: 8px;
+  }
+  .stat {
+    flex: 1;
+    padding: 6px 8px;
+    background: #fdf2e3;
+    border: 1px solid #e0a86b;
+    border-radius: 6px;
+  }
+  .stat-num {
+    font-size: 16px;
+    font-weight: 700;
+    color: #b8732a;
+    line-height: 1.1;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: #8a9388;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-top: 1px;
+  }
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .filter-pill {
+    font-size: 9.5px;
+    background: #fafaf3;
+    border: 1px solid #d6d8c7;
+    border-radius: 12px;
+    padding: 2px 8px;
+    color: #5a6359;
+  }
+  .filter-pill.active {
+    background: #fdf2e3;
+    border-color: #e0a86b;
+    color: #b8732a;
+    font-weight: 600;
+  }
+  .export-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .export-btn {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #b8732a;
+    color: #b8732a;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .export-btn.primary {
+    background: #b8732a;
+    color: #fff;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid #d6d8c7;
+    margin-top: 10px;
+    padding-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #8a9388;
+  }
+  footer strong { color: #5a6359; }
+
+  .access-line {
+    display: flex;
+    gap: 14px;
+  }
+  .access-item { display: flex; align-items: center; gap: 4px; }
+  .access-dot {
+    width: 8px; height: 8px; border-radius: 2px;
+  }
+  .ad-greg { background: #e0a86b; }
+  .ad-ofelia { background: #a89dc7; }
+  .ad-yard { background: #7bb38a; }
+  .ad-kendall { background: #d49770; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="future-tag">Future · Phase 2</div>
+
+    <header>
+      <div class="eyebrow">Phase 2 of 2 · Future Development</div>
+      <h1>OCWR × Agromin — dispatch.agromin.com Screens</h1>
+      <p>Four role-based pages on a single web app. Everyone gets a URL bookmarked in their browser — no install, no login complexity, no new platform to learn.</p>
+    </header>
+
+    <div class="screens">
+
+      <!-- 1. Greg's Delivery Queue -->
+      <div class="screen greg">
+        <div class="browser-bar">
+          <div class="traffic"><span></span><span></span><span></span></div>
+          <div class="url">dispatch.agromin.com/deliveries</div>
+        </div>
+        <div class="screen-header">
+          <div class="screen-title">Delivery Queue</div>
+          <span class="who-tag">Greg / Brian</span>
+        </div>
+        <div class="screen-body">
+          <div class="queue-row">
+            <span class="status-dot dot-pending"></span>
+            <div class="row-info">
+              <div class="row-name">Martinez, R. — 417 Skyhigh Dr, Anaheim</div>
+              <div class="row-meta">20 cu yds · Cover Mulch · #108870</div>
+            </div>
+            <span class="row-action action-schedule">Schedule</span>
+          </div>
+          <div class="queue-row">
+            <span class="status-dot dot-called"></span>
+            <div class="row-info">
+              <div class="row-name">Chen, L. — 88 Rancho Rd, Irvine</div>
+              <div class="row-meta">15 cu yds · Compost · #108901 · called 2:14pm</div>
+            </div>
+            <span class="row-action action-schedule">Schedule</span>
+          </div>
+          <div class="queue-row">
+            <span class="status-dot dot-scheduled"></span>
+            <div class="row-info">
+              <div class="row-name">Patel, A. — 204 Oak St, Buena Park</div>
+              <div class="row-meta">10 cu yds · Compost · #108901 · Apr 22 · 8–10am</div>
+            </div>
+            <span class="row-action action-view">View</span>
+          </div>
+          <div class="queue-row">
+            <span class="status-dot dot-pending"></span>
+            <div class="row-info">
+              <div class="row-name">Nguyen, T. — 1102 Sunset Pl, Costa Mesa</div>
+              <div class="row-meta">8 cu yds · Compost · #108922</div>
+            </div>
+            <span class="row-action action-schedule">Schedule</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Ofelia's Schedule View -->
+      <div class="screen ofelia">
+        <div class="browser-bar">
+          <div class="traffic"><span></span><span></span><span></span></div>
+          <div class="url">dispatch.agromin.com/schedule</div>
+        </div>
+        <div class="screen-header">
+          <div class="screen-title">Delivery Schedule</div>
+          <span class="who-tag">Ofelia · read-only</span>
+        </div>
+        <div class="screen-body">
+          <div class="week-label">Week of Apr 20, 2026</div>
+          <div class="sched-row">
+            <div class="sched-date">Tue Apr 22</div>
+            <div class="sched-info">
+              <div class="row-name">Patel, A. — Buena Park</div>
+              <div class="row-meta">10 cu yds Compost · 8–10am · #108901</div>
+            </div>
+          </div>
+          <div class="sched-row">
+            <div class="sched-date">Thu Apr 24</div>
+            <div class="sched-info">
+              <div class="row-name">Kim, S. — 55 Hillcrest, Fullerton</div>
+              <div class="row-meta">20 cu yds Cover Mulch · 1–3pm · #108915</div>
+            </div>
+          </div>
+          <div class="sched-row">
+            <div class="sched-date">Fri Apr 25</div>
+            <div class="sched-info">
+              <div class="row-name">Chen, L. — Irvine</div>
+              <div class="row-meta">15 cu yds Compost · 9–11am · #108901</div>
+            </div>
+          </div>
+          <div class="sched-row tbd">
+            <div class="sched-date">TBD</div>
+            <div class="sched-info">
+              <div class="row-name">Martinez, R. — Anaheim</div>
+              <div class="row-meta">20 cu yds Cover Mulch · awaiting customer · #108870</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Yard Fulfillment Log -->
+      <div class="screen yard">
+        <div class="browser-bar">
+          <div class="traffic"><span></span><span></span><span></span></div>
+          <div class="url">dispatch.agromin.com/yard-log</div>
+        </div>
+        <div class="screen-header">
+          <div class="screen-title">Yard Fulfillment Log</div>
+          <span class="who-tag">Yard staff · gate tablet</span>
+        </div>
+        <div class="screen-body">
+          <div class="form-grid full">
+            <div>
+              <div class="field-label">Order number</div>
+              <div class="field-input filled">#108870</div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div>
+              <div class="field-label">Customer (auto-fill)</div>
+              <div class="field-input filled">Martinez, R.</div>
+            </div>
+            <div>
+              <div class="field-label">Yard</div>
+              <div class="field-input filled">Frank R. Bowerman</div>
+            </div>
+            <div>
+              <div class="field-label">Material loaded</div>
+              <div class="field-input">Compost / Cover Mulch</div>
+            </div>
+            <div>
+              <div class="field-label">Quantity (cu yds)</div>
+              <div class="field-input">Enter qty…</div>
+            </div>
+            <div>
+              <div class="field-label">Staff initials</div>
+              <div class="field-input">Your initials</div>
+            </div>
+            <div>
+              <div class="field-label">Timestamp</div>
+              <div class="field-input filled">auto · Apr 26 4:08pm</div>
+            </div>
+          </div>
+          <button class="submit-btn">Log fulfillment ›</button>
+        </div>
+      </div>
+
+      <!-- 4. Kendall's Compliance Reports -->
+      <div class="screen kendall">
+        <div class="browser-bar">
+          <div class="traffic"><span></span><span></span><span></span></div>
+          <div class="url">dispatch.agromin.com/reports</div>
+        </div>
+        <div class="screen-header">
+          <div class="screen-title">Compliance Reports</div>
+          <span class="who-tag">Kendall · OCWR</span>
+        </div>
+        <div class="screen-body">
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-num">247</div>
+              <div class="stat-label">Fulfillments<br>this quarter</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">1,832</div>
+              <div class="stat-label">Cubic yards<br>diverted</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">89%</div>
+              <div class="stat-label">SB 1383 form<br>completion</div>
+            </div>
+          </div>
+          <div class="filter-row" style="margin-top: 4px;">
+            <span class="filter-pill active">All yards</span>
+            <span class="filter-pill">Bowerman</span>
+            <span class="filter-pill">Prima Deshecha</span>
+            <span class="filter-pill">Olinda Alpha</span>
+          </div>
+          <div class="filter-row">
+            <span class="field-label" style="margin: 0;">Date range</span>
+            <span class="filter-pill active">Q2 2026 (Apr–Jun)</span>
+            <span class="filter-pill">Custom…</span>
+          </div>
+          <div class="export-row">
+            <span class="export-btn primary">⇩ Export CSV</span>
+            <span class="export-btn">⇩ Export Excel</span>
+            <span class="export-btn">⇩ SB 1383 PDF</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <div class="access-line">
+        <div class="access-item"><span class="access-dot ad-greg"></span>Greg / Brian — schedule deliveries</div>
+        <div class="access-item"><span class="access-dot ad-ofelia"></span>Ofelia — see what's scheduled</div>
+        <div class="access-item"><span class="access-dot ad-yard"></span>Yard staff — log loads at the gate</div>
+        <div class="access-item"><span class="access-dot ad-kendall"></span>Kendall — pull SB 1383 reports</div>
+      </div>
+      <div>Single web app · <strong>dispatch.agromin.com</strong> · no install, no separate login</div>
+    </footer>
+  </div>
+</body>
+</html>

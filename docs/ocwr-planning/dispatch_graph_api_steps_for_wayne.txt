@@ -1,0 +1,91 @@
+Wayne,
+
+Picking up where we left off — here's the consolidated, working sequence. The previous attempts failed because (a) New-ApplicationAccessPolicy doesn't support shared mailboxes, and (b) we used the wrong Object ID. This sequence uses RBAC for Applications (Microsoft's modern approach) and addresses both issues.
+
+Steps 1–4 you already completed (app registered, Mail.Send permission added, admin consent granted, client secret created). Pick up from Step 5 below.
+
+
+REFERENCE — VALUES YOU ALREADY HAVE
+
+App display name:           Agromin Coupon Dispatch
+Application (client) ID:    8e2401b3-83b0-4edb-9d4e-d72c8de70ab9
+Application Object ID:      e507e531-bd07-40f8-aa2a-2d6a3cf9569d   (NOT used below — different from Service Principal Object ID)
+Directory (tenant) ID:      dce62a0e-e19d-4909-89d8-f2cd97760aaf
+Client secret value:        (please send to Rick separately — secure channel)
+
+
+===========================================================
+STEP 5 — Get the Service Principal Object ID
+===========================================================
+
+There are two different objects in Entra:
+   - "App Registrations"     → the blueprint   → Object ID e507e531-... (NOT what we need)
+   - "Enterprise Applications" → the instance  → has its own different Object ID (THIS is what we need)
+
+Get the Service Principal Object ID one of two ways:
+
+  Option A — UI (fastest):
+    Microsoft Entra admin center → Enterprise Applications → search "Agromin Coupon Dispatch"
+    → click it → copy the Object ID from the Overview page
+
+  Option B — PowerShell:
+    Connect-MgGraph -Scopes "Application.Read.All" -NoWelcome
+    Get-MgServicePrincipal -Filter "appId eq '8e2401b3-83b0-4edb-9d4e-d72c8de70ab9'" |
+        Select-Object Id, DisplayName, AppId
+
+    The "Id" field returned is the Service Principal Object ID.
+
+
+===========================================================
+STEP 6 — Configure RBAC for Applications in Exchange Online
+===========================================================
+
+Run this in an Exchange Online PowerShell session (Connect-ExchangeOnline first if not already connected).
+
+REPLACE <SP-OBJECT-ID> with the Service Principal Object ID from Step 5.
+
+# 6a — Register the app as a service principal in Exchange Online
+New-ServicePrincipal `
+    -AppId "8e2401b3-83b0-4edb-9d4e-d72c8de70ab9" `
+    -ServiceId "<SP-OBJECT-ID>" `
+    -DisplayName "Agromin Coupon Dispatch"
+
+# 6b — Create a recipient scope restricted to just the dispatch mailbox
+New-ManagementScope `
+    -Name "CouponDispatchMailboxScope" `
+    -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'dispatch@agromin.com'"
+
+# 6c — Assign the Mail.Send role to the app, scoped to that mailbox only
+New-ManagementRoleAssignment `
+    -App "8e2401b3-83b0-4edb-9d4e-d72c8de70ab9" `
+    -Role "Application Mail.Send" `
+    -CustomResourceScope "CouponDispatchMailboxScope"
+
+If 6a returns "service principal already exists," skip it and continue with 6b and 6c.
+
+
+===========================================================
+STEP 7 — Verify
+===========================================================
+
+Test-ServicePrincipalAuthorization `
+    -Identity "8e2401b3-83b0-4edb-9d4e-d72c8de70ab9" `
+    -Resource "dispatch@agromin.com"
+
+Expected: result indicating authorization granted (looks like "Granted" / similar).
+Please send Rick a screenshot of this output.
+
+
+===========================================================
+WHAT TO SEND BACK TO RICK
+===========================================================
+
+1. The client secret value from your earlier app registration step (secure channel — not regular email)
+2. Screenshot of Step 7 output showing authorization granted
+
+Once Rick has both, he wires the credentials into the Cloud Run service and tests an end-to-end email send. No further action from you after that.
+
+
+Thanks Wayne — sorry for the false starts. The shared-mailbox + RBAC quirks aren't obvious from Microsoft's docs.
+
+Rick

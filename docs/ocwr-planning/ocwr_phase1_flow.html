@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OCWR × Agromin — Order Processing Flow</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #f5f5f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #2c3e2d;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .stage {
+    width: 100%;
+    max-width: 1400px;
+    aspect-ratio: 16 / 9;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    border-bottom: 2px solid #6b8e4e;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  header h1 {
+    font-size: 22px;
+    color: #4a6b3a;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  header p {
+    font-size: 12px;
+    color: #6c7a6d;
+    margin-top: 2px;
+  }
+
+  .lane-labels {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .row {
+    display: contents;
+  }
+
+  .lane-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #6c7a6d;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: right;
+    padding-right: 8px;
+    border-right: 2px solid #d6d8c7;
+  }
+
+  .resident .lane-label { color: #4a6b3a; }
+  .system .lane-label { color: #5a4a8e; }
+  .ocwr .lane-label { color: #b8732a; }
+
+  .lane {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .step {
+    flex: 1;
+    background: #fafaf3;
+    border: 1.5px solid #d6d8c7;
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .step.split {
+    padding: 8px 8px 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .step.split .split-row {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .step.split .sub {
+    flex: 1;
+    border-radius: 6px;
+    padding: 6px 8px;
+    border: 1px solid;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: #fff;
+  }
+  .sub.self {
+    background: #f3f7ed;
+    border-color: #a3c178;
+  }
+  .sub.staff {
+    background: #f3f7ed;
+    border-color: #a3c178;
+  }
+  .sub.delivery {
+    background: #fdf2e3;
+    border-color: #e0a86b;
+  }
+
+  .resident .step {
+    background: #f3f7ed;
+    border-color: #a3c178;
+  }
+  .system .step {
+    background: #f0eef7;
+    border-color: #a89dc7;
+  }
+  .ocwr .step {
+    background: #fdf2e3;
+    border-color: #e0a86b;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2c3e2d;
+    margin-bottom: 3px;
+  }
+  .step-desc {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #5a6359;
+  }
+
+  .arrow {
+    color: #9ca39a;
+    font-size: 18px;
+    font-weight: bold;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .step .badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #6c7a6d;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    background: #fff;
+    border: 1px solid #c0c4b3;
+    color: #4a6b3a;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-top: 3px;
+    font-weight: 600;
+  }
+  .system .pill { color: #5a4a8e; border-color: #b3aac9; }
+
+  .sys-tag {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #5a4a8e;
+    background: #fff;
+    border: 1px solid #b3aac9;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+    align-self: flex-start;
+  }
+
+  .step.stores {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+  }
+  .store {
+    background: #fff;
+    border: 1px solid #b3aac9;
+    border-radius: 6px;
+    padding: 4px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .store .sys-tag {
+    margin-bottom: 1px;
+    font-size: 9px;
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+  .store .store-label {
+    font-size: 10px;
+    color: #5a6359;
+    line-height: 1.2;
+  }
+  .store.sharepoint {
+    border-color: #e0a86b;
+    background: #fdf7ee;
+  }
+  .store.sharepoint .sys-tag { color: #b8732a; }
+
+  footer {
+    border-top: 1px solid #d6d8c7;
+    margin-top: 12px;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 10.5px;
+    color: #5a6359;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .swatch {
+    width: 12px; height: 12px; border-radius: 3px;
+    border: 1.5px solid;
+  }
+  .sw-resident { background: #f3f7ed; border-color: #a3c178; }
+  .sw-system { background: #f0eef7; border-color: #a89dc7; }
+  .sw-ocwr { background: #fdf2e3; border-color: #e0a86b; }
+
+  .footnote {
+    font-size: 10px;
+    color: #8a9388;
+    text-align: right;
+  }
+
+  .footnote strong { color: #5a6359; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <header>
+      <h1>OCWR × Agromin — Phase 1 Order Processing Flow</h1>
+      <p>How an OC resident's free compost / mulch order travels from shop.agromin.com to material pickup or delivery</p>
+    </header>
+
+    <div class="lane-labels">
+
+      <!-- ROW 1: RESIDENT -->
+      <div class="row resident">
+        <div class="lane-label">Resident</div>
+        <div class="lane">
+          <div class="step">
+            <div class="badge">Step 1</div>
+            <div class="step-title">Place order</div>
+            <div class="step-desc">Resident visits shop.agromin.com, enters OC jurisdiction coupon code at checkout</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 2</div>
+            <div class="step-title">Coupon validated</div>
+            <div class="step-desc">CIMcloud confirms coupon is active and address falls within the claimed OC city or unincorporated area</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 6</div>
+            <div class="step-title">Receive instructions</div>
+            <div class="step-desc">Confirmation email with pickup or delivery details</div>
+            <span class="pill">dispatch@agromin.com</span>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 8</div>
+            <div class="step-title">Receive material</div>
+            <div class="step-desc">Self-load, staff-load, or delivery completed at scheduled time</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: AUTOMATED SYSTEM -->
+      <div class="row system">
+        <div class="lane-label">Automation</div>
+        <div class="lane">
+          <div class="step">
+            <div class="badge">Step 3</div>
+            <span class="sys-tag">CIMcloud → M365</span>
+            <div class="step-title">Order email lands</div>
+            <div class="step-desc">Inbox / OCWR folder</div>
+            <span class="pill">sales@agromin.com</span>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 4</div>
+            <span class="sys-tag">Power Automate</span>
+            <div class="step-title">Triggered on inbound mail</div>
+            <div class="step-desc">Watches <strong>Inbox/OCWR</strong> · subject filter: "Pending Approval for Order Number"</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step split">
+            <span class="sys-tag">Cloud Run</span>
+            <div class="split-row">
+              <div class="sub self">
+                <div class="step-title" style="font-size: 11px;">Self-load</div>
+                <div class="step-desc">&lt; 5 cu yds</div>
+              </div>
+              <div class="sub staff">
+                <div class="step-title" style="font-size: 11px;">Staff-load</div>
+                <div class="step-desc">≥ 5 cu yds</div>
+              </div>
+              <div class="sub delivery">
+                <div class="step-title" style="font-size: 11px;">Delivery</div>
+                <div class="step-desc">scheduled</div>
+              </div>
+            </div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step stores">
+            <div class="badge">Logged</div>
+            <div class="store">
+              <span class="sys-tag">Firestore</span>
+              <div class="store-label">All orders · Agromin internal log</div>
+            </div>
+            <div class="store sharepoint">
+              <span class="sys-tag">SharePoint Excel</span>
+              <div class="store-label"><strong>Greg's Master Sheet</strong><br>OCWR-Agromin Deliveries.xlsx · Table1<br><em>Delivery orders only · STATUS = In Process</em></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 3: OCWR / AGROMIN PEOPLE -->
+      <div class="row ocwr">
+        <div class="lane-label">OCWR &amp; Agromin</div>
+        <div class="lane">
+          <div class="step">
+            <div class="badge">Visibility</div>
+            <div class="step-title">Ofelia CC'd</div>
+            <div class="step-desc">All customer-facing emails copy ofelia.velarde-garcia@ocwr.ocgov.com</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 5</div>
+            <div class="step-title">Coordinator alerted</div>
+            <div class="step-desc">Delivery orders trigger alert to Greg, Brian &amp; Kendall to schedule within 1 business day</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 7</div>
+            <div class="step-title">SB 1383 logging</div>
+            <div class="step-desc">At yard, resident scans QR code → Microsoft Form → SharePoint log monitored by Kendall</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Reporting</div>
+            <div class="step-title">Compliance reports</div>
+            <div class="step-desc">Kendall compiles SB 1383 organics-diversion records for state submission</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch sw-resident"></span>Resident actions</div>
+        <div class="legend-item"><span class="swatch sw-system"></span>Automated systems</div>
+        <div class="legend-item"><span class="swatch sw-ocwr"></span>OCWR &amp; Agromin people</div>
+      </div>
+      <div class="footnote">
+        Yards: <strong>Frank R. Bowerman</strong> · <strong>Prima Deshecha</strong> · <strong>Olinda Alpha</strong>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coupon-dispatch — Service Reference</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #1a4f8a;
+      --blue-lt: #3b82f6;
+      --blue-bg: #dbeafe;
+      --green:   #2d6a4f;
+      --green-bg:#d8f3dc;
+      --amber:   #7d4e00;
+      --amber-bg:#fff3cd;
+      --gray:    #4a5568;
+      --gray-lt: #718096;
+      --border:  #e2e8f0;
+      --bg:      #f7fafc;
+      --white:   #ffffff;
+      --code-bg: #edf2f7;
+      --radius:  6px;
+      --shadow:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      color: #1a202c;
+      background: var(--bg);
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--blue);
+      color: #fff;
+      padding: 40px 48px 32px;
+    }
+    header .eyebrow {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      opacity: .7;
+      margin-bottom: 6px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+    }
+    header .tagline {
+      margin-top: 6px;
+      opacity: .85;
+      font-size: 15px;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    .meta-item { font-size: 13px; opacity: .8; }
+    .meta-item strong { opacity: 1; font-weight: 600; }
+
+    /* ── Layout ── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 80px;
+    }
+
+    /* ── Sections ── */
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--blue);
+      border-bottom: 2px solid var(--blue-bg);
+      padding-bottom: 6px;
+      margin-bottom: 20px;
+    }
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 18px 0 8px;
+    }
+    p { margin-bottom: 12px; color: var(--gray); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Endpoint cards ── */
+    .endpoint {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--blue-lt);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .method {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--green-bg);
+      color: var(--green);
+      white-space: nowrap;
+    }
+    .method.post  { background: var(--blue-bg);  color: var(--blue);  }
+    .path {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+    .endpoint-desc { color: var(--gray); font-size: 14px; }
+    .endpoint-note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--gray-lt);
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    /* ── Routing matrix ── */
+    .routing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .routing-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .routing-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--blue);
+      margin-bottom: 6px;
+    }
+    .routing-trigger {
+      font-size: 13px;
+      color: var(--gray-lt);
+      margin-bottom: 8px;
+    }
+    .routing-actions li {
+      font-size: 13px;
+      color: var(--gray);
+      margin-left: 16px;
+      margin-bottom: 3px;
+    }
+    @media (max-width: 640px) { .routing-grid { grid-template-columns: 1fr; } }
+
+    /* ── Email matrix ── */
+    .email-matrix {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .email-matrix table { width: 100%; font-size: 13.5px; }
+    .email-matrix thead th {
+      background: var(--code-bg);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--gray);
+      border-bottom: 1px solid var(--border);
+    }
+    .email-matrix tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .email-matrix tbody tr:last-child td { border-bottom: none; }
+    .check { color: #2d6a4f; font-weight: 700; }
+    .dash  { color: #cbd5e0; }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step; }
+    .step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+    .step-content { flex: 1; }
+    .step-title  { font-weight: 600; color: #2d3748; font-size: 14px; }
+    .step-detail { font-size: 13px; color: var(--gray-lt); margin-top: 2px; }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead th {
+      text-align: left;
+      padding: 9px 12px;
+      background: var(--code-bg);
+      color: var(--gray);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f9fafb; }
+
+    /* ── Code ── */
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12.5px;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #c7254e;
+    }
+    pre {
+      background: #1a202c;
+      color: #e2e8f0;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      overflow-x: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+      margin: 12px 0;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      vertical-align: middle;
+    }
+    .badge-blue   { background: var(--blue-bg);  color: var(--blue);  }
+    .badge-green  { background: var(--green-bg); color: var(--green); }
+    .badge-amber  { background: var(--amber-bg); color: var(--amber); }
+    .badge-gray   { background: var(--code-bg);  color: var(--gray);  }
+
+    /* ── Status ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      background: var(--blue-bg);
+      border: 1px solid #93c5fd;
+      margin-bottom: 20px;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--blue-lt);
+      flex-shrink: 0;
+    }
+    .status-text { font-size: 14px; color: var(--blue); font-weight: 600; }
+    .status-sub  { font-size: 13px; color: var(--gray-lt); margin-left: auto; }
+
+    /* ── Two col ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Related ── */
+    .related {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .related-label { font-size: 12px; color: var(--gray-lt); text-transform: uppercase; letter-spacing: .05em; }
+    .related-name  { font-size: 15px; font-weight: 600; color: #2d3748; margin-top: 2px; }
+    .related-arrow { font-size: 20px; color: var(--gray-lt); }
+
+    /* ── Callout ── */
+    .callout {
+      background: var(--amber-bg);
+      border-left: 4px solid #f59e0b;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: 14px;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Agromin · GCP Project: juris-coupon-valid · us-west1</div>
+  <h1>coupon-dispatch</h1>
+  <div class="tagline">Routes confirmed program orders — sends customer emails, alerts coordinators, logs to Firestore, and returns SharePoint row data</div>
+  <div class="meta-row">
+    <div class="meta-item"><strong>URL</strong><br>coupon-dispatch-751008504644.us-west1.run.app</div>
+    <div class="meta-item"><strong>Runtime</strong><br>Python 3.11 · FastAPI · Cloud Run</div>
+    <div class="meta-item"><strong>Auth secret</strong><br><code style="opacity:.9">DISPATCH_API_KEY</code></div>
+    <div class="meta-item"><strong>Caller</strong><br>Power Automate (post-order email)</div>
+    <div class="meta-item"><strong>Status</strong><br>Active development — Phase 1</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Status -->
+  <div class="status-row" style="margin-top:32px;">
+    <div class="status-dot"></div>
+    <div class="status-text">Deployed — coupon-dispatch-00010-rgn · Phase 1 live, pending final Excel end-to-end test</div>
+    <div class="status-sub">Source: dispatch/</div>
+  </div>
+
+  <!-- Purpose -->
+  <section>
+    <h2>What this service does</h2>
+    <p>
+      After a customer completes an order on <strong>shop.agromin.com</strong> using an Agromin program coupon,
+      CIMcloud emails a "Pending Approval for Order Number XXXXX" HTML notification to
+      <code>sales@agromin.com</code>. A <strong>Power Automate</strong> flow watches the <code>OCWR</code>
+      subfolder of that mailbox, parses the email body, and POSTs the raw HTML to this service.
+    </p>
+    <p>
+      This service parses the HTML, decides how to fulfill the order, sends the right emails,
+      writes the order to Firestore, and returns structured row data for Power Automate to
+      append to Greg's SharePoint spreadsheet.
+    </p>
+    <p>
+      It does <strong>not</strong> validate coupons — that happens upstream in
+      <strong>coupon-validator</strong> at checkout. By the time an order arrives here, it is a confirmed program order.
+    </p>
+  </section>
+
+  <!-- Order processing flow -->
+  <section>
+    <h2>Order processing flow</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Receive &amp; parse email</div>
+          <div class="step-detail">Power Automate POSTs the raw CIMcloud HTML body to <code>/api/ingest-cimcloud-email</code>. BeautifulSoup parses customer name, email, phone, addresses, shipping method, coupon code, and line items. Non-program emails (no <code>Coupon Code:</code> field) are skipped silently.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Determine routing</div>
+          <div class="step-detail">
+            Inspects <code>shipping_method</code> for the word "Delivery" (case-insensitive).<br>
+            If delivery → infer region from shipping address (OC / Ventura / Sacramento).<br>
+            If pickup → sum line item qty: &lt;5 yd = self-load, ≥5 yd = staff-load.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Write to Firestore</div>
+          <div class="step-detail">Document keyed by <code>order_number</code> in the <code>order_events</code> collection. Records routing, region, material, qty, customer contact, and processed timestamp. Non-fatal on failure — email still sends.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Send customer email</div>
+          <div class="step-detail">Microsoft Graph API sends as <code>dispatch@agromin.com</code>. Template chosen by routing (self-load / staff-load / delivery). Ofelia (OCWR liaison) is CC'd on every customer email.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Send coordinator alert (delivery orders only)</div>
+          <div class="step-detail">Separate email to coordinator team — includes customer name, phone, email, address, material, qty, and coupon code. Recipients vary by region.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Return <code>master_sheet_rows</code></div>
+          <div class="step-detail">Response includes an array of row dicts (one per line item) for Power Automate to append to Greg's <code>OCWR-Agromin Deliveries.xlsx</code> → <code>Table1</code>. Empty array for pickup orders.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Routing -->
+  <section>
+    <h2>Routing outcomes</h2>
+    <div class="routing-grid">
+      <div class="routing-card">
+        <div class="routing-label">pickup_self_load</div>
+        <div class="routing-trigger">Trigger: no "Delivery" in shipping_method AND total qty &lt; 5 yd</div>
+        <ul class="routing-actions">
+          <li>Customer email: self-load pickup instructions + yard address/hours</li>
+          <li>SB1383 QR note included if yard has a QR sign deployed</li>
+          <li>No coordinator alert</li>
+          <li>No spreadsheet row</li>
+        </ul>
+      </div>
+      <div class="routing-card">
+        <div class="routing-label">pickup_staff_load</div>
+        <div class="routing-trigger">Trigger: no "Delivery" in shipping_method AND total qty ≥ 5 yd</div>
+        <ul class="routing-actions">
+          <li>Customer email: staff-load pickup instructions (truck/trailer required)</li>
+          <li>No SB1383 QR note</li>
+          <li>No coordinator alert</li>
+          <li>No spreadsheet row</li>
+        </ul>
+      </div>
+      <div class="routing-card">
+        <div class="routing-label">delivery</div>
+        <div class="routing-trigger">Trigger: "Delivery" appears anywhere in shipping_method</div>
+        <ul class="routing-actions">
+          <li>Customer email: delivery confirmation</li>
+          <li>Coordinator alert sent to regional team</li>
+          <li>Spreadsheet row(s) returned in response</li>
+          <li>Region inferred from shipping address</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Email matrix -->
+  <section>
+    <h2>Email recipients by order type</h2>
+    <div class="email-matrix">
+      <table>
+        <thead>
+          <tr>
+            <th>Order type</th>
+            <th>Customer</th>
+            <th>Ofelia (CC)</th>
+            <th>Greg, Brian, Kendall</th>
+            <th>Chris (Ventura)</th>
+            <th>Rosa (Sacramento)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Pickup — any size</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+          </tr>
+          <tr>
+            <td>Delivery — OC</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+          </tr>
+          <tr>
+            <td>Delivery — Ventura</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+            <td class="dash">—</td>
+          </tr>
+          <tr>
+            <td>Delivery — Sacramento</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;color:var(--gray-lt);margin-top:8px;">
+      All customer emails are sent from <code>dispatch@agromin.com</code> via Microsoft Graph API (app-only auth, RBAC-scoped to that mailbox).
+      Coordinator alerts are a separate email — not CC'd to the customer or Ofelia.
+    </p>
+  </section>
+
+  <!-- Endpoints -->
+  <section>
+    <h2>Endpoints</h2>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="path">/api/ingest-cimcloud-email</span>
+        <span class="badge badge-blue">Primary — called by Power Automate</span>
+      </div>
+      <div class="endpoint-desc">
+        Accepts the raw HTML body of a CIMcloud "Pending Approval" email.
+        Parses it server-side, runs the full routing + email + Firestore pipeline, and returns structured response including <code>master_sheet_rows</code>.
+      </div>
+      <div class="endpoint-note">
+        <strong>Auth:</strong> <code>X-API-Key: $DISPATCH_API_KEY</code><br>
+        <strong>Body (Power Automate):</strong> <code>Content-Type: text/html</code> + optional <code>X-Email-Subject</code> header — raw HTML.<br>
+        <strong>Body (curl/test):</strong> <code>Content-Type: application/json</code> → <code>{"body": "&lt;html&gt;...", "subject": "..."}</code><br>
+        <strong>Skip response:</strong> <code>{"status": "skipped", "reason": "..."}</code> — non-program emails silently ignored, Power Automate loop runs zero times.
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="path">/api/ingest-order</span>
+        <span class="badge badge-gray">Structured JSON variant</span>
+      </div>
+      <div class="endpoint-desc">
+        Same pipeline as <code>/api/ingest-cimcloud-email</code> but accepts a pre-parsed
+        <code>OrderPayload</code> JSON object. Used for direct API testing without a real email.
+      </div>
+      <div class="endpoint-note">
+        <strong>Auth:</strong> <code>X-API-Key: $DISPATCH_API_KEY</code><br>
+        <strong>Body:</strong> <code>OrderPayload</code> JSON — see schema below.
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="path">/api/generate-manifest</span>
+      </div>
+      <div class="endpoint-desc">
+        Generates a PDF delivery manifest for a hauler. Returns binary PDF bytes directly.
+        Manifest includes order #, customer name/phone/address, material, quantity, coupon code,
+        hauler signature line, and OCWR loader verification line.
+      </div>
+      <div class="endpoint-note">
+        <strong>Auth:</strong> <code>X-API-Key: $DISPATCH_API_KEY</code><br>
+        <strong>Body:</strong> <code>OrderPayload</code> JSON<br>
+        <strong>Response:</strong> <code>Content-Type: application/pdf</code> · <code>Content-Disposition: attachment; filename=manifest_{order_number}.pdf</code><br>
+        <strong>Library:</strong> reportlab (pure Python — no system dependencies)
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/api/delivery-schedule</span>
+      </div>
+      <div class="endpoint-desc">
+        Returns all delivery orders from the last 7 days, queried from Firestore <code>order_events</code>.
+        Intended for a Cloud Scheduler trigger (weekly Ofelia summary).
+      </div>
+      <div class="endpoint-note">
+        <strong>Auth:</strong> <code>X-API-Key: $DISPATCH_API_KEY</code><br>
+        <strong>Response:</strong> <code>{"deliveries": [{order_number, customer_name, shipping_address, material, total_qty, region, processed_at, ...}]}</code>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/health</span>
+      </div>
+      <div class="endpoint-desc">Returns <code>{"status": "healthy", "service": "coupon-dispatch"}</code> with HTTP 200.</div>
+    </div>
+  </section>
+
+  <!-- OrderPayload schema -->
+  <section>
+    <h2>OrderPayload schema</h2>
+    <p>Used by <code>/api/ingest-order</code> and <code>/api/generate-manifest</code>. The <code>/api/ingest-cimcloud-email</code> endpoint builds this internally from the HTML.</p>
+<pre><code>{
+  "order_number":   "A109591",          // CIMcloud format — "A" prefix stripped for spreadsheet
+  "order_date":     "4/16/2026 11:38:23 AM PT",
+  "coupon_code":    "CITYOJAICM26",
+  "payment_method": "No Payment Required",
+  "customer_name":  "Coline Tabrum",
+  "customer_email": "coellii@yahoo.co.nz",
+  "customer_phone": "805-640-0650",     // optional
+  "billing_address":"1242 Anita Ave, Ojai, CA 93023",
+  "shipping_address":"1940 E Ojai Ave, Ojai, CA 93023",
+  "shipping_method":"Bag Pick Up at Aqua-Flo Ojai",
+  "line_items": [
+    {
+      "sku":         "ES2",
+      "description": "Cover Mulch",
+      "qty":         20,                // cubic yards for bulk material
+      "unit_price":  35.95
+    }
+  ]
+}</code></pre>
+    <p style="font-size:13px;color:var(--gray-lt);">
+      Routing key: <code>shipping_method</code> containing "Delivery" (case-insensitive) → delivery route.
+      All other values → pickup route. Qty threshold for self vs. staff load: 5 cubic yards.
+    </p>
+  </section>
+
+  <!-- Response schema -->
+  <section>
+    <h2>Response schema</h2>
+<pre><code>{
+  "status":             "processed",
+  "order_number":       "A109591",
+  "routing":            "delivery",           // pickup_self_load | pickup_staff_load | delivery
+  "region":             "oc",                 // oc | ventura | sacramento
+  "total_qty":          20,
+  "master_sheet_rows": [                      // [] for pickup orders
+    {
+      "Customer":              "Coline Tabrum",
+      "STATUS":                "In Process",
+      "Date of \nRequest":     "2026-05-06",
+      "Sales Order#":          109591,         // integer, A-prefix stripped
+      "Phone #":               "805-640-0650",
+      "Email":                 "coellii@yahoo.co.nz",
+      "Delivery Address":      "1940 E Ojai Ave",
+      "City":                  "Ojai",
+      "State":                 "CA",
+      "Zip\nCode":             "93023",
+      "Material":              "Mulch",
+      "Mulch\n(Quantity)":     20,
+      "Compost\n(Quantity)":   "",
+      "Notes":                 "Auto-imported 5/6/26. Origin TBD — Greg to assign yard.",
+      // ... all 23 Table1 columns
+    }
+  ]
+}</code></pre>
+    <p style="font-size:13px;color:var(--gray-lt);">
+      Column header keys in <code>master_sheet_rows</code> contain literal <code>\n</code> characters — they must match Greg's Excel <code>Table1</code> headers exactly (including embedded newlines from cell wrapping).
+    </p>
+  </section>
+
+  <!-- Yard locations -->
+  <section>
+    <h2>Yard locations</h2>
+    <table>
+      <thead>
+        <tr><th>Yard</th><th>Match key(s)</th><th>Region</th><th>Address</th><th>Hours</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Frank R. Bowerman</strong></td>
+          <td><code>bowerman</code></td>
+          <td>OC</td>
+          <td>11002 Bee Canyon Access Rd, Irvine, CA 92602</td>
+          <td>Mon–Sat 8am–4pm</td>
+        </tr>
+        <tr>
+          <td><strong>Prima Deshecha</strong></td>
+          <td><code>deshecha</code></td>
+          <td>OC</td>
+          <td>32250 Avenida La Pata, San Juan Capistrano, CA 92675</td>
+          <td>Mon–Sat 8am–4pm</td>
+        </tr>
+        <tr>
+          <td><strong>Olinda Alpha</strong></td>
+          <td><code>olinda</code></td>
+          <td>OC</td>
+          <td>1942 Valencia Avenue, Brea, CA 92823</td>
+          <td>Mon–Sat 7am–3pm</td>
+        </tr>
+        <tr>
+          <td><strong>Aqua-Flo Ojai</strong></td>
+          <td><code>ojai</code></td>
+          <td>Ventura</td>
+          <td>1940 E Ojai Ave, Ojai, CA 93023</td>
+          <td>Mon–Fri 7am–4:30pm | Sat 7am–12pm</td>
+        </tr>
+        <tr>
+          <td><strong>Aqua-Flo Ventura</strong></td>
+          <td><code>aqua-flo ventura</code>, <code>portola</code></td>
+          <td>Ventura</td>
+          <td>2471 Portola Rd #300, Ventura, CA 93003</td>
+          <td>Mon–Fri 7am–4:30pm | Sat 7am–12pm</td>
+        </tr>
+        <tr>
+          <td><strong>Agromin Kinetic</strong></td>
+          <td><code>kinetic</code></td>
+          <td>Ventura</td>
+          <td>201 Kinetic Drive, Oxnard, CA 93030</td>
+          <td>Mon–Fri 7am–4:30pm | Sat 7am–12pm</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--gray-lt);margin-top:8px;">
+      Matching is case-insensitive substring of <code>shipping_method</code> against <code>match_keys</code>.
+      Falls back to generic Agromin contact info if no match.
+    </p>
+  </section>
+
+  <!-- Infrastructure -->
+  <section>
+    <h2>Infrastructure</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>Email — Microsoft Graph API</h3>
+        <p style="font-size:14px;">
+          App-only client-credentials flow via MSAL. Token cached until 60 s before expiry.
+          Sends as <code>dispatch@agromin.com</code> only — RBAC-scoped in Exchange Online.
+          Graph creds: <code>GRAPH_TENANT_ID</code>, <code>GRAPH_CLIENT_ID</code>, <code>GRAPH_CLIENT_SECRET</code>.
+          If any are unset, email is skipped with a warning log (safe for local dev).
+        </p>
+      </div>
+      <div class="card">
+        <h3>Firestore</h3>
+        <p style="font-size:14px;">
+          Collection: <code>order_events</code>. Document ID = <code>order_number</code>.
+          Authenticated via Cloud Run default service account.
+          Role required: <code>Cloud Datastore User</code>.
+          Write failures are non-fatal — logged but do not stop email dispatch.
+        </p>
+      </div>
+    </div>
+    <div class="two-col" style="margin-top:0;">
+      <div class="card">
+        <h3>HTML parser</h3>
+        <p style="font-size:14px;">
+          BeautifulSoup4 parses CIMcloud email HTML.
+          Auto-detects and decodes quoted-printable encoding.
+          Extracts fields by label matching in <code>&lt;td&gt;</code> cells and
+          line-item table detection via header keywords (Qty, Description, Unit Price).
+        </p>
+      </div>
+      <div class="card">
+        <h3>PDF manifest</h3>
+        <p style="font-size:14px;">
+          reportlab — pure Python, no system dependencies.
+          Letter size, 0.85" margins.
+          Returns binary PDF as <code>application/pdf</code> response.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Env vars -->
+  <section>
+    <h2>Environment variables</h2>
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Required</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>DISPATCH_API_KEY</code></td><td><span class="badge badge-green">Yes</span></td><td>Shared secret with Power Automate. Checked on every endpoint.</td></tr>
+        <tr><td><code>GRAPH_TENANT_ID</code></td><td><span class="badge badge-blue">For email</span></td><td>Azure AD directory (tenant) ID for the Agromin app registration.</td></tr>
+        <tr><td><code>GRAPH_CLIENT_ID</code></td><td><span class="badge badge-blue">For email</span></td><td>Application (client) ID for the "Agromin Coupon Dispatch" Azure AD app.</td></tr>
+        <tr><td><code>GRAPH_CLIENT_SECRET</code></td><td><span class="badge badge-blue">For email</span></td><td>Client secret. Rotate quarterly. Converged provisions replacements.</td></tr>
+        <tr><td><code>MAIL_SENDER</code></td><td><span class="badge badge-gray">No</span></td><td>Defaults to <code>dispatch@agromin.com</code>.</td></tr>
+        <tr><td><code>OFELIA_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>CC on every customer email. Skipped if unset.</td></tr>
+        <tr><td><code>GREG_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>OC delivery coordinator. Defaults to <code>greg@agromin.com</code>.</td></tr>
+        <tr><td><code>BRIAN_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>OC delivery coordinator. Defaults to <code>brian@agromin.com</code>.</td></tr>
+        <tr><td><code>KENDALL_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>OC coordinator / OCWR side. Defaults to <code>kendall@agromin.com</code>.</td></tr>
+        <tr><td><code>CHRIS_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>Ventura delivery coordinator. Defaults to <code>chris@agromin.com</code>.</td></tr>
+        <tr><td><code>ROSA_EMAIL</code></td><td><span class="badge badge-gray">No</span></td><td>Sacramento delivery coordinator. Defaults to <code>rosa@agromin.com</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Power Automate -->
+  <section>
+    <h2>Power Automate integration</h2>
+    <div class="callout">
+      Flow lives in <strong>Rick Wilson's Environment</strong> (not Agromin default) — flow name: <strong>Agromin Order Dispatch</strong>.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Step</th><th>Action</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Trigger</td>
+          <td>"When a new email arrives in a shared mailbox (V2)" · mailbox: <code>sales@agromin.com</code> · folder: <code>OCWR</code></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>HTTP POST</td>
+          <td>Raw HTML body → <code>/api/ingest-cimcloud-email</code> with <code>X-API-Key</code>. Content-Type: <code>text/html</code>.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Parse JSON</td>
+          <td>Reads Cloud Run response — extracts <code>master_sheet_rows</code> array.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Apply to each</td>
+          <td>Loops over <code>master_sheet_rows</code>. Pickup orders produce an empty array → loop runs zero times.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Add a row into a table</td>
+          <td>Excel Online (Business) · Site: <code>OCWRxAgromin</code> · File: <code>Delivery Requests/OCWR-Agromin Deliveries.xlsx</code> · Table: <code>Table1</code> · All 23 columns bound by header name.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--gray-lt);margin-top:12px;">
+      To manually trigger for testing: send a CIMcloud-formatted email to <code>sales@agromin.com</code>,
+      then drag it into the <code>OCWR</code> subfolder in Outlook. Power Automate fires within ~60 seconds.
+    </p>
+  </section>
+
+  <!-- Deploy -->
+  <section>
+    <h2>Deploy</h2>
+    <p>The dispatch service is deployed from the <strong><code>dispatch/</code> subdirectory</strong>:</p>
+<pre><code>cd dispatch/
+gcloud run deploy coupon-dispatch \
+  --source . \
+  --region us-west1 \
+  --project juris-coupon-valid \
+  --allow-unauthenticated \
+  --quiet</code></pre>
+
+    <h3 style="margin-top:20px;">Tail logs</h3>
+<pre><code>gcloud beta run services logs tail coupon-dispatch \
+  --region=us-west1 \
+  --project=juris-coupon-valid</code></pre>
+
+    <h3>Health check</h3>
+<pre><code>curl https://coupon-dispatch-751008504644.us-west1.run.app/health</code></pre>
+  </section>
+
+  <!-- Related -->
+  <section>
+    <h2>Related service</h2>
+    <a href="service-coupon-validator.html" style="text-decoration:none;">
+      <div class="related">
+        <div>
+          <div class="related-label">Runs before this service</div>
+          <div class="related-name">coupon-validator — Coupon + address validation at CIMcloud checkout</div>
+        </div>
+        <div class="related-arrow">→</div>
+      </div>
+    </a>
+  </section>
+
+</main>
+</body>
+</html>

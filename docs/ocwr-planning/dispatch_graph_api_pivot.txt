@@ -1,0 +1,69 @@
+Wayne,
+
+Quick pivot before you start the password reset work — please disregard that previous instruction set. I'd like to switch approaches.
+
+Reason: the SMTP AUTH path I had you queued up for has four prerequisites stacked behind it (Exchange Online Plan 1 license at ~$4/mo, Security Defaults disabled, no Conditional Access MFA on this account, and tenant-wide SMTP AUTH enabled). Any one of them being a "no" puts us back at square one. On top of that, Microsoft has been progressively deprecating SMTP AUTH since 2022 — even if we get it working this week, it's a fragile foundation.
+
+The cleaner approach is to use the Microsoft Graph API with app-only authentication. The Cloud Run service authenticates as a registered Azure AD application (not as a mailbox user) and sends mail via the Graph /sendMail endpoint. No license required, no MFA conflict, no Security Defaults concern, and it's the path Microsoft is actively pushing customers toward.
+
+
+WHAT I NEED FROM YOU
+
+A one-time setup in Microsoft Entra (Azure AD). Roughly 15 minutes:
+
+1. Register a new application
+   - Microsoft Entra admin center → Identity → Applications → App registrations → New registration
+   - Name: "Agromin Coupon Dispatch"
+   - Supported account types: "Accounts in this organizational directory only (single tenant)"
+   - Redirect URI: leave blank
+   - Click Register
+
+2. Capture and send me three values from the app's Overview page:
+   - Application (client) ID
+   - Directory (tenant) ID
+   - The agromin.com tenant domain (e.g. agromin.onmicrosoft.com)
+
+3. Create a client secret
+   - In the app: Certificates & secrets → New client secret
+   - Description: "Cloud Run dispatch service"
+   - Expires: 24 months
+   - Copy the secret VALUE (not the ID) immediately — it's only shown once
+   - Send me the secret value
+
+4. Grant the app permission to send mail
+   - In the app: API permissions → Add a permission
+   - Microsoft Graph → Application permissions → Mail.Send
+   - Click "Grant admin consent for Agromin"
+
+5. Scope the permission to ONLY dispatch@agromin.com (important — least privilege)
+   This step uses Exchange Online PowerShell, not the Entra UI:
+
+   Connect-ExchangeOnline -ShowBanner:$false
+
+   New-ApplicationAccessPolicy `
+       -AppId "<Application (client) ID from step 2>" `
+       -PolicyScopeGroupId "dispatch@agromin.com" `
+       -AccessRight RestrictAccess `
+       -Description "Restrict Coupon Dispatch app to dispatch mailbox only"
+
+   Test-ApplicationAccessPolicy `
+       -Identity "dispatch@agromin.com" `
+       -AppId "<Application (client) ID>"
+
+   The Test command should return AccessCheckResult: Granted. Please send me a screenshot of that output.
+
+
+WHAT YOU CAN SKIP
+
+Everything from the previous email — no password set, no AccountEnabled flip, no license assignment, no SMTP AUTH verification. None of that is needed for the Graph API approach.
+
+
+SECURITY NOTE
+
+The application-level permission scoping in Step 5 is critical. Without that policy, the app can technically send mail as ANY user in the tenant. The New-ApplicationAccessPolicy command restricts it to just dispatch@agromin.com — Microsoft's recommended pattern for service applications.
+
+
+Once I have the three IDs and the secret, I'll wire it into the Cloud Run service and we can test end-to-end. Sorry for the back-and-forth — better to land on the right architecture now than fight SMTP AUTH for another week.
+
+Thanks,
+Rick

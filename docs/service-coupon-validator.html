@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coupon-validator — Service Reference</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #2d6a4f;
+      --green-lt:#52b788;
+      --green-bg:#d8f3dc;
+      --red:     #9b2335;
+      --red-bg:  #fce4e4;
+      --amber:   #7d4e00;
+      --amber-bg:#fff3cd;
+      --gray:    #4a5568;
+      --gray-lt: #718096;
+      --border:  #e2e8f0;
+      --bg:      #f7fafc;
+      --white:   #ffffff;
+      --code-bg: #edf2f7;
+      --radius:  6px;
+      --shadow:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      color: #1a202c;
+      background: var(--bg);
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--green);
+      color: #fff;
+      padding: 40px 48px 32px;
+    }
+    header .eyebrow {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      opacity: .7;
+      margin-bottom: 6px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+    }
+    header .tagline {
+      margin-top: 6px;
+      opacity: .85;
+      font-size: 15px;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    .meta-item { font-size: 13px; opacity: .8; }
+    .meta-item strong { opacity: 1; font-weight: 600; }
+
+    /* ── Layout ── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 80px;
+    }
+
+    /* ── Sections ── */
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--green);
+      border-bottom: 2px solid var(--green-bg);
+      padding-bottom: 6px;
+      margin-bottom: 20px;
+    }
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 18px 0 8px;
+    }
+    p { margin-bottom: 12px; color: var(--gray); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Endpoint cards ── */
+    .endpoint {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--green-lt);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .method {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--green-bg);
+      color: var(--green);
+      white-space: nowrap;
+    }
+    .method.post { background: #dbeafe; color: #1e40af; }
+    .path {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+    .endpoint-desc { color: var(--gray); font-size: 14px; }
+    .endpoint-note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--gray-lt);
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    /* ── Flow steps ── */
+    .steps { counter-reset: step; }
+    .step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--green);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+    .step-content { flex: 1; }
+    .step-title { font-weight: 600; color: #2d3748; font-size: 14px; }
+    .step-detail { font-size: 13px; color: var(--gray-lt); margin-top: 2px; }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead th {
+      text-align: left;
+      padding: 9px 12px;
+      background: var(--code-bg);
+      color: var(--gray);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f9fafb; }
+
+    /* ── Code ── */
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12.5px;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #c7254e;
+    }
+    pre {
+      background: #1a202c;
+      color: #e2e8f0;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      overflow-x: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+      margin: 12px 0;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      vertical-align: middle;
+    }
+    .badge-green  { background: var(--green-bg); color: var(--green); }
+    .badge-amber  { background: var(--amber-bg); color: var(--amber); }
+    .badge-gray   { background: var(--code-bg);  color: var(--gray);  }
+
+    /* ── Status ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      background: var(--green-bg);
+      border: 1px solid var(--green-lt);
+      margin-bottom: 20px;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green-lt);
+      flex-shrink: 0;
+    }
+    .status-text { font-size: 14px; color: var(--green); font-weight: 600; }
+    .status-sub  { font-size: 13px; color: var(--gray-lt); margin-left: auto; }
+
+    /* ── Grid ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Related link ── */
+    .related {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .related-label { font-size: 12px; color: var(--gray-lt); text-transform: uppercase; letter-spacing: .05em; }
+    .related-name  { font-size: 15px; font-weight: 600; color: #2d3748; margin-top: 2px; }
+    .related-arrow { font-size: 20px; color: var(--gray-lt); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Agromin · GCP Project: juris-coupon-valid · us-west1</div>
+  <h1>coupon-validator</h1>
+  <div class="tagline">Validates coupon codes and customer addresses at checkout — called by CIMcloud</div>
+  <div class="meta-row">
+    <div class="meta-item"><strong>URL</strong><br>coupon-validator-751008504644.us-west1.run.app</div>
+    <div class="meta-item"><strong>Runtime</strong><br>Python 3.11 · FastAPI · Cloud Run</div>
+    <div class="meta-item"><strong>Auth secret</strong><br><code style="opacity:.9">UPLOAD_API_KEY</code></div>
+    <div class="meta-item"><strong>Status</strong><br>Production · Stable</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Status -->
+  <div class="status-row" style="margin-top:32px;">
+    <div class="status-dot"></div>
+    <div class="status-text">Live — production endpoint called by CIMcloud at every checkout</div>
+    <div class="status-sub">Do not modify existing endpoints</div>
+  </div>
+
+  <!-- Purpose -->
+  <section>
+    <h2>What this service does</h2>
+    <p>
+      When a customer enters a coupon code at <strong>shop.agromin.com</strong>, CIMcloud calls this service
+      before allowing the order to proceed. The service geocodes the customer's address, maps it to a
+      California CDTFA tax district, and confirms the coupon is valid for that location.
+    </p>
+    <p>
+      It is a pure validation gate — it does not send email, log orders, or trigger fulfillment.
+      Those responsibilities belong to <strong>coupon-dispatch</strong>, which runs separately after the order is confirmed.
+    </p>
+  </section>
+
+  <!-- Validation flow -->
+  <section>
+    <h2>Validation logic — <code>/api/validate-coupon</code></h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Coupon lookup</div>
+          <div class="step-detail">Normalize code to uppercase. Check the loaded coupon dataset — return <code>denied</code> immediately if not found.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Status check</div>
+          <div class="step-detail">Coupon <code>Program Status</code> field must equal <code>Active</code> (case-insensitive). Inactive or expired records are rejected.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Date range check</div>
+          <div class="step-detail">Today must fall within the coupon's <code>Start Date</code> and <code>End Date</code>. Either bound may be open-ended (null = no limit).</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Geocode address</div>
+          <div class="step-detail">ArcGIS World Geocoding Service → lat/lon + canonical matched address. Returns <code>error</code> if the address cannot be geocoded.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">CDTFA shapefile lookup</div>
+          <div class="step-detail">Point-in-polygon against the 26 MB <code>CDTFA_TaxDistricts.gpkg</code> bundled in the container. Returns city name and county name for the address.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-title">Jurisdiction match</div>
+          <div class="step-detail">
+            City coupons: address city must match the coupon jurisdiction (normalized, prefix-stripped).<br>
+            County coupons: address must be in the unincorporated portion of that county (no city match → accepted; city match → denied).
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Endpoints -->
+  <section>
+    <h2>Endpoints</h2>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/api/validate-coupon</span>
+        <span class="badge badge-green">Primary</span>
+      </div>
+      <div class="endpoint-desc">
+        Full coupon + address validation. Called by CIMcloud at checkout. Runs all six checks above.
+      </div>
+      <div class="endpoint-note">
+        <strong>Query params:</strong> <code>coupon</code> (code string), <code>address</code> (full CA address)<br>
+        <strong>Response:</strong> <code>{"status": "accepted"|"denied"|"error", "coupon": "...", "jurisdiction": "...", "matched_address": "...", "reason": "..."}</code>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/api/validate</span>
+      </div>
+      <div class="endpoint-desc">
+        Address-only jurisdiction lookup — no coupon check. Returns what CDTFA district an address falls in.
+        Useful for manual lookups and debugging.
+      </div>
+      <div class="endpoint-note">
+        <strong>Query params:</strong> <code>address</code>, <code>jurisdiction</code> (claimed)<br>
+        <strong>Response:</strong> <code>{"status": "accepted"|"denied"|"error", "claimed_jurisdiction": "...", "actual_jurisdiction": "...", "matched_address": "..."}</code>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="path">/api/upload-coupons</span>
+        <span class="badge badge-amber">Requires X-API-Key</span>
+      </div>
+      <div class="endpoint-desc">
+        Admin endpoint to replace the coupon dataset. Accepts <code>.xlsx</code> (preferred) or <code>.csv</code>
+        via multipart upload or raw binary body. Saves locally, syncs to GCS bucket
+        <code>agromin-coupon-data</code>, and forces a cache refresh. Changes take effect within seconds.
+      </div>
+      <div class="endpoint-note">
+        <strong>Auth:</strong> <code>X-API-Key: $UPLOAD_API_KEY</code><br>
+        <strong>Response:</strong> <code>{"status": "success", "coupons_loaded": N}</code>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/</span>
+      </div>
+      <div class="endpoint-desc">
+        Manual validation web form — HTML page for staff to hand-check a coupon + address in a browser.
+        No auth required.
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header">
+        <span class="method">GET</span>
+        <span class="path">/health</span>
+      </div>
+      <div class="endpoint-desc">
+        Cloud Run health check. Returns <code>{"status": "healthy"}</code> with HTTP 200.
+      </div>
+    </div>
+  </section>
+
+  <!-- Coupon data -->
+  <section>
+    <h2>Coupon data</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>Source file</h3>
+        <p style="font-size:14px;">
+          <code>coupons.xlsx</code> stored in GCS bucket <code>agromin-coupon-data</code>.
+          Loaded at startup; cached in-process for <strong>5 minutes</strong>.
+          Admin uploads via <code>/api/upload-coupons</code> bypass the TTL immediately.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Required columns</h3>
+        <p style="font-size:14px;">
+          <code>Coupon</code> — code string<br>
+          <code>Program Status</code> — must be <code>Active</code><br>
+          <code>Jurisdiction</code> — city or county name<br>
+          <code>Start Date</code> — M/D/YY or blank<br>
+          <code>End Date</code> — M/D/YY or blank
+        </p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px;">Active programs (83 coupon codes)</h3>
+    <table>
+      <thead>
+        <tr><th>Program</th><th>Coverage</th><th>Code pattern</th><th>Launch</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>OCWR (Orange County)</strong></td>
+          <td>34 OC cities + OC Unincorporated</td>
+          <td><code>CITY[ABB]COM26</code> / <code>CITY[ABB]CM26</code></td>
+          <td>April 15, 2026</td>
+        </tr>
+        <tr>
+          <td><strong>Ventura County</strong></td>
+          <td>Ventura, Oxnard, Camarillo, Fillmore, Ojai</td>
+          <td>Same pattern</td>
+          <td>In system — not active rollout</td>
+        </tr>
+        <tr>
+          <td><strong>Sacramento</strong></td>
+          <td>City of Sacramento</td>
+          <td>Same pattern</td>
+          <td>In system — not active rollout</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--gray-lt);margin-top:8px;">
+      County coupons (<code>COU[ABB]COM26</code> / <code>COU[ABB]CM26</code>) validate only against unincorporated county addresses.
+    </p>
+  </section>
+
+  <!-- Infrastructure -->
+  <section>
+    <h2>Infrastructure</h2>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Shapefile</strong></td>
+          <td><code>CDTFA_TaxDistricts.gpkg</code> — 26 MB, bundled in container, loaded at startup via GeoPandas. Heavy image because of GDAL system dependencies.</td>
+        </tr>
+        <tr>
+          <td><strong>Geocoder</strong></td>
+          <td>ArcGIS World Geocoding Service. API key in <code>ARCGIS_API_KEY</code> env var.</td>
+        </tr>
+        <tr>
+          <td><strong>GCS bucket</strong></td>
+          <td><code>agromin-coupon-data</code> — coupon file storage. Authenticated via Cloud Run default service account.</td>
+        </tr>
+        <tr>
+          <td><strong>CORS</strong></td>
+          <td>Allowed origins: <code>shop.agromin.com</code>, <code>commercial.agromin.com</code>, CIMcloud staging domains (<code>*.agromin.mycimstaging.com</code>, <code>*.agromin.cimstaging.com</code>).</td>
+        </tr>
+        <tr>
+          <td><strong>Dockerfile</strong></td>
+          <td><code>python:3.11-slim</code> + <code>libgdal-dev</code>, <code>libgeos-dev</code>, <code>libproj-dev</code>. Entrypoint: <code>uvicorn main:app --host 0.0.0.0 --port 8080</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Env vars -->
+  <section>
+    <h2>Environment variables</h2>
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Required</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ARCGIS_API_KEY</code></td><td><span class="badge badge-green">Yes</span></td><td>ArcGIS geocoding API key</td></tr>
+        <tr><td><code>UPLOAD_API_KEY</code></td><td><span class="badge badge-green">Yes</span></td><td>Auth secret for <code>/api/upload-coupons</code>. Defaults to weak placeholder if unset.</td></tr>
+        <tr><td><code>COUPONS_BUCKET</code></td><td><span class="badge badge-gray">No</span></td><td>GCS bucket name. Defaults to <code>agromin-coupon-data</code>.</td></tr>
+        <tr><td><code>CORS_ALLOW_ORIGINS</code></td><td><span class="badge badge-gray">No</span></td><td>Comma-separated allowed origins override.</td></tr>
+        <tr><td><code>CORS_ALLOW_ORIGIN_REGEX</code></td><td><span class="badge badge-gray">No</span></td><td>Regex override for allowed origins.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Sample responses -->
+  <section>
+    <h2>Sample responses</h2>
+    <h3>Accepted</h3>
+<pre><code>{
+  "status": "accepted",
+  "coupon": "CITYOJAICM26",
+  "jurisdiction": "City of Ojai",
+  "matched_address": "1242 Anita Ave, Ojai, CA 93023",
+  "reason": "Address is within coupon jurisdiction"
+}</code></pre>
+
+    <h3>Denied — wrong jurisdiction</h3>
+<pre><code>{
+  "status": "denied",
+  "coupon": "CITYOJAICM26",
+  "jurisdiction": "City of Ojai",
+  "actual_jurisdiction": "City of Ventura",
+  "matched_address": "800 S Victoria Ave, Ventura, CA 93003",
+  "reason": "Address is in City of Ventura, not City of Ojai"
+}</code></pre>
+
+    <h3>Denied — county coupon used in city</h3>
+<pre><code>{
+  "status": "denied",
+  "coupon": "COUOCCOM26",
+  "jurisdiction": "Orange County",
+  "actual_jurisdiction": "City of Irvine",
+  "reason": "Address is in City of Irvine, not Orange County"
+}</code></pre>
+  </section>
+
+  <!-- Deploy -->
+  <section>
+    <h2>Deploy</h2>
+    <p>The validator is deployed from the <strong>repo root</strong> (not the <code>dispatch/</code> subdirectory):</p>
+<pre><code># From repo root
+gcloud run deploy coupon-validator \
+  --source . \
+  --region us-west1 \
+  --project juris-coupon-valid \
+  --allow-unauthenticated \
+  --quiet</code></pre>
+    <p style="font-size:13px;color:var(--gray-lt);">
+      CI/CD: GitHub Actions builds on push to main → Docker → Artifact Registry → Cloud Run.
+      The validator and dispatch services are deployed and versioned independently.
+    </p>
+  </section>
+
+  <!-- Related -->
+  <section>
+    <h2>Related service</h2>
+    <a href="service-coupon-dispatch.html" style="text-decoration:none;">
+      <div class="related">
+        <div>
+          <div class="related-label">Runs after this service</div>
+          <div class="related-name">coupon-dispatch — Order routing, email dispatch &amp; Firestore logging</div>
+        </div>
+        <div class="related-arrow">→</div>
+      </div>
+    </a>
+  </section>
+
+</main>
+</body>
+</html>

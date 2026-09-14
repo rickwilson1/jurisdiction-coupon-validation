@@ -1,0 +1,124 @@
+Hi Kendall,
+
+The automated dispatch pipeline is now wired up end-to-end and ready
+for its first real test. About 5 minutes of your time.
+
+Place ONE test order on shop.agromin.com. Within ~60 seconds you
+should receive a "Your Agromin Order #A1XXXX — Pickup Instructions"
+email. This time it's real automation, not just data capture.
+
+Please reply to this email with:
+  - The order number you placed
+  - Whether you received the dispatch email (yes/no)
+  - Whether the email looks correct (details to verify below)
+
+If anything fails or looks wrong, screenshot it. That's exactly what
+we need to find before we go live.
+
+
+===========================================================
+HOW TO PLACE THE TEST ORDER
+===========================================================
+
+1. Go to shop.agromin.com (use your KendallTestOCWR account if
+   you have it; otherwise sign in normally and prefix the name
+   with "TEST").
+
+2. Add to cart:
+     - Compost 100, qty 3 cubic yards
+     (Or any bulk material between 1 and 5 cubic yards — keeps it
+      a "self-load" pickup, which is the simplest path to test.)
+
+3. Proceed to checkout.
+
+4. Use a TEST address — please prefix the customer name with "TEST"
+   so the Agromin team knows this isn't a real customer. Example:
+     Name:    TEST - Kendall Avrea
+     Email:   YOUR OWN email (this is critical — we need YOU to
+              receive the automated email so you can verify it)
+     Phone:   your own phone
+     Address: any real OC address (your own is fine)
+
+5. Pick PICKUP. Then choose the OCWR yard:
+     - Olinda Alpha Landfill Pick Up   (best — already tested)
+     - Frank R. Bowerman Landfill Pick Up
+     - Prima Deshecha Landfill Pick Up
+
+6. Apply an OCWR coupon code that matches the city you used. For
+   Anaheim addresses, "CityANAcom26" works.
+
+7. Confirm and submit. The coupon zeros out the cost.
+
+8. Note the order number (e.g. A109592) and start a stopwatch.
+
+
+===========================================================
+WHAT TO EXPECT — within ~60 seconds
+===========================================================
+
+You should receive an email from "dispatch@agromin.com" titled:
+
+   Your Agromin Order #A1XXXX — Pickup Instructions
+
+The email will include:
+  - Greeting using the name you used at checkout
+  - The yard you picked (name, address, phone, hours)
+  - Quantity and material from your order
+  - The order number
+  - An SB 1383 paragraph asking you to scan the QR sign at the yard
+
+Ofelia (ofelia.velarde-garcia@ocwr.ocgov.com) will be CC'd. That's
+intentional — she's the OCWR contact for these orders and gets a
+copy of every customer dispatch email.
+
+
+===========================================================
+WHAT TO VERIFY (and reply back to Rick on)
+===========================================================
+
+[ ] Did the email arrive within 1-2 minutes? (yes / no / how long)
+
+[ ] Is the order number on the email the same one you placed?
+
+[ ] Does the customer name in the email greeting match the name you
+    used at checkout?
+
+[ ] Is the yard listed in the email the one you picked at checkout?
+
+[ ] Are the yard address, phone, and hours correct?
+
+[ ] Did the email arrive from "dispatch@agromin.com" (not from
+    sales@ or noreply@cimcloud.com)?
+
+[ ] Is Ofelia CC'd?
+
+If any answer is "no" or "wrong", reply with details and a
+screenshot. We'll fix and re-test.
+
+
+===========================================================
+WHAT IF NOTHING ARRIVES
+===========================================================
+
+If 5 minutes pass with no email:
+
+1. Check your spam / junk folder. The dispatch sender is new and
+   could get filtered the first time.
+
+2. Reply to this email with the order number anyway. Rick will
+   look at the Power Automate run history and the Cloud Run logs
+   to see what stage broke. There are good logs at every step,
+   so we'll find it fast.
+
+
+===========================================================
+QUESTIONS?
+===========================================================
+
+Reply here or text Rick. If anything in checkout looks off (coupon
+doesn't apply, the OCWR yards aren't an option, etc.), screenshot
+it — that's also useful feedback.
+
+Thanks for being the first to put this through real-world paces.
+
+Rick

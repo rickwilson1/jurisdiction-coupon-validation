@@ -1,0 +1,115 @@
+  AGROMIN — COUPON DISPATCH SERVICE  ·  Cloud Run  ·  GCP  ·  2026-06-04
+  ─────────────────────────────────────────────────────────────────────────
+
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  TRIGGER  (asynchronous — fires after the order is placed in CIMcloud)                                       │
+  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  CIMcloud          order email          Outlook              Power Automate flow            Cloud Run
+  shop.agromin.com ──────────────────▶  sales@agromin.com   "Agromin Order Dispatch"        coupon-dispatch
+  places order                          /OCWR folder  ──────▶ trigger: subject contains  ──▶ POST /api/ingest-
+                                                              "Pending Approval for          cimcloud-email
+                                                              Order Number NNNNNN"           + X-API-Key header
+                                                              parses HTML body
+                                                              POSTs raw email body
+
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  CLOUD RUN SERVICE: coupon-dispatch                                                                          │
+  │  URL: coupon-dispatch-751008504644.us-west1.run.app  ·  Project: juris-coupon-valid  ·  Region: us-west1     │
+  └───────────────────────────────────────────────────────────┬─────────────────────────────────────────────────┘
+                                                              │
+                                          POST /api/ingest-cimcloud-email
+                                                              │
+                                                              ▼
+                                          ┌───────────────────────────────────────┐
+                                          │  parse_cimcloud_email(html_body)       │
+                                          │  ─────────────────────────────────     │
+                                          │  BeautifulSoup HTML parser              │
+                                          │  extracts:                              │
+                                          │   order_number · customer_name          │
+                                          │   customer_email · shipping_address     │
+                                          │   shipping_method · line_items          │
+                                          │   quantities · totals · coupon_code     │
+                                          └───────────────────┬───────────────────┘
+                                                              │
+                                                              ▼
+                                          ┌───────────────────────────────────────┐
+                                          │  _process_order(order)                 │
+                                          │  ─────────────────────────────────     │
+                                          │  1. infer_region_from_address()        │
+                                          │     → OC / Ventura / Sacramento        │
+                                          │  2. get_yard_for_order()               │
+                                          │     → Oxnard · Camarillo · Dos Palos   │
+                                          │     → Florin Perkins (Sacramento)      │
+                                          │  3. routing decision ───────────────── │
+                                          │                                         │
+                                          │     shipping == "delivery"             │
+                                          │         → delivery path                │
+                                          │     shipping == "pickup"               │
+                                          │         qty < 5 cy → self-load         │
+                                          │         qty ≥ 5 cy → staff-load        │
+                                          └───────┬───────────────┬───────────────┘
+                                                  │               │
+                                    ┌─────────────┘               └─────────────────┐
+                                    │   PICKUP PATH                                  │  DELIVERY PATH
+                                    ▼                                                ▼
+                       ┌─────────────────────────┐                    ┌──────────────────────────────┐
+                       │  send_email() via        │                    │  send_email() via             │
+                       │  Microsoft Graph API     │                    │  Microsoft Graph API          │
+                       │  ─────────────────────── │                    │  ──────────────────────────── │
+                       │  To:  customer@…         │                    │  To:  customer@…              │
+                       │  From: dispatch@agromin  │                    │  From: dispatch@agromin       │
+                       │  CC:  ofelia@ (OCWR)     │                    │  CC:  ofelia@ (OCWR)          │
+                       │                          │                    │                               │
+                       │  body: yard address,     │                    │  body: delivery ack,          │
+                       │  hours, what to bring    │                    │  coordinator will call        │
+                       └──────────────────────────┘                    │                               │
+                                                                       │  + coordinator alert emails   │
+                                                                       │  To: greg@ · brian@ ·         │
+                                                                       │      kendall@agromin          │
+                                                                       └───────────────────────────────┘
+
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  SIDE EFFECTS  (happen on every processed order)                                                             │
+  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+     Firestore                         SharePoint Excel                    JSON response to PA
+     ─────────────────────────────     ───────────────────────────────     ────────────────────────────
+     collection: order_events          OCWRxAgromin site                   { routing, master_sheet_rows,
+     one document per order            Deliveries.xlsx · Table1            email_sent, order_number }
+     keys: order_number · region ·     PA appends row using Excel          PA reads master_sheet_rows
+     routing · customer details ·      Online connector (Stage A)          and appends to Table1
+     timestamps                        delivery orders only
+
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  OTHER ENDPOINTS                                                                                             │
+  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  POST /api/ingest-order                 Accepts pre-parsed OrderPayload JSON directly
+                                         Used for manual testing / future integrations
+
+  POST /api/generate-manifest            Builds a PDF manifest (reportlab) for delivery haulers
+                                         Returns PDF bytes; OCWR yard staff sign at pickup
+
+  GET  /api/delivery-schedule            Weekly delivery summary email to Ofelia
+                                         Triggered by Cloud Scheduler every Friday 4 PM PT
+
+  GET  /health                           { status: "ok" }
+  GET  /                                 Service info page
+
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  INFRASTRUCTURE DEPENDENCIES                                                                                 │
+  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  GCP (dev team admin)                              Microsoft 365 (Converged MSP admin)
+  ────────────────────────────────────────          ──────────────────────────────────────────────────────
+  Firestore    order_events collection              dispatch@agromin.com   sender mailbox (Graph Mail.Send)
+  Secret Mgr   DISPATCH_API_KEY                     sales@agromin.com      inbound trigger (Power Automate)
+               GRAPH_CLIENT_ID                      Azure AD app reg       Mail.Send, RBAC to dispatch@ only
+               GRAPH_TENANT_ID                      SharePoint             OCWRxAgromin · Deliveries.xlsx
+               GRAPH_CLIENT_SECRET (rotate 90d)     Power Automate flow    owner: rickwilson@ — must transfer

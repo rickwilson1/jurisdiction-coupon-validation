@@ -1,0 +1,83 @@
+  AGROMIN — COUPON VALIDATOR SERVICE  ·  Cloud Run  ·  GCP  ·  2026-06-04
+  ─────────────────────────────────────────────────────────────────────────
+
+
+  CALLER                              CLOUD RUN SERVICE: coupon-validator
+  ─────────────────────────────────   ──────────────────────────────────────────────────────
+                                      URL: coupon-validator-751008504644.us-west1.run.app
+  CIMcloud checkout                   Project: juris-coupon-valid  ·  Region: us-west1
+  shop.agromin.com          ─────────▶
+                                      ┌──────────────────────────────────────────────────┐
+  GET /api/validate-coupon            │  STARTUP  (once per container cold-start)        │
+  ?code=OCWRANACOM26                  │   load_tax_districts()  →  cache in memory       │
+  &address=123 Main St OC             │   load_coupons()        →  cache in memory       │
+                                      └───────────────────┬──────────────────────────────┘
+                                                          │
+  Admin (direct / CI)       ─────────▶                   ▼
+  POST /api/upload-coupons            ┌──────────────────────────────────────────────────┐
+  X-Upload-API-Key: ••••              │  ENDPOINTS                                       │
+                                      │                                                  │
+  Monitoring                          │  GET  /api/validate-coupon   (primary)           │
+  GET /health               ─────────▶│    1. geocode_address() → ArcGIS REST API        │
+                                      │    2. find_tax_district() → GeoPandas point-in   │
+  Manual testing                      │       -polygon against CDTFA shapefile           │
+  GET /                     ─────────▶│    3. load_coupons() → GCS xlsx/csv (5-min TTL) │
+  (HTML form)                         │    4. jurisdictions_match() → city or county     │
+                                      │       claim vs actual CDTFA district             │
+                                      │    5. validate_coupon_dates() → date range check │
+                                      │    6. return { valid, reason }                   │
+                                      │                                                  │
+                                      │  GET  /api/validate                              │
+                                      │    address → jurisdiction lookup only            │
+                                      │    (no coupon check)                             │
+                                      │                                                  │
+                                      │  POST /api/upload-coupons                        │
+                                      │    accepts xlsx or csv upload                    │
+                                      │    writes to GCS + invalidates cache             │
+                                      │    requires X-Upload-API-Key header              │
+                                      │                                                  │
+                                      │  GET  /health                                    │
+                                      │  GET  /   (manual validation form, HTML)         │
+                                      └───────────┬──────────────────┬───────────────────┘
+                                                  │                  │
+                                                  ▼                  ▼
+               ┌──────────────────────────────────┐    ┌────────────────────────────────┐
+               │  EXTERNAL DEPENDENCY             │    │  GCP STORAGE                   │
+               │  ArcGIS World Geocoder           │    │                                │
+               │  geocode-api.arcgis.com          │    │  GCS  agromin-coupon-data      │
+               │                                  │    │  coupons.xlsx  /  coupons.csv  │
+               │  • converts address to lat/lng   │    │  5-minute TTL cache in memory  │
+               │  • ARCGIS_API_KEY env var        │    │  admin uploads update this     │
+               │  • 15-second timeout             │    │                                │
+               └──────────────────────────────────┘    │  Bundled in container image:   │
+                                                        │  CDTFA_TaxDistricts.gpkg       │
+                                                        │  (26 MB CalRecycle shapefile)  │
+                                                        │  loaded once at cold-start     │
+                                                        └────────────────────────────────┘
+
+
+  COUPON VALIDATION LOGIC
+  ─────────────────────────────────────────────────────────────────────────
+
+  Jurisdiction matching rules                   Date / status checks
+  ─────────────────────────────────             ─────────────────────────
+  Code type: CITY  → city must match            coupon must exist in list
+  Code type: COUNTY→ must be unincorporated     status must be "active"
+             county (not inside any city)       start_date ≤ today ≤ end_date
+  Match logic: normalize both sides,
+               partial-name aware               any failure → 400 with reason
+
+
+  SECRETS  (GCP Secret Manager — juris-coupon-valid)
+  ─────────────────────────────────────────────────────────────────────────
+  ARCGIS_API_KEY      geocoding requests to ArcGIS
+  UPLOAD_API_KEY      protects POST /api/upload-coupons
+  COUPONS_BUCKET      GCS bucket name (default: agromin-coupon-data)
+
+
+  PROGRAMS SERVED  (83 active coupon codes)
+  ─────────────────────────────────────────────────────────────────────────
+  Orange County (OCWR)     34 cities + OC unincorporated   started 4/15/2026
+  Ventura County           Ventura city/county · Oxnard · Camarillo · Fillmore · Ojai
+  Sacramento               City of Sacramento
+  Code pattern:  CITY[ABB]COM26 = compost   ·   CITY[ABB]CM26 = cover mulch

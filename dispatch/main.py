@@ -640,9 +640,11 @@ def send_email(
 # ---------------------------------------------------
 # CUSTOMER EMAIL CONTENT
 #
-# Body copy is transcribed from Kendall's July 2026 Word templates:
+# Body copy is transcribed from Kendall's July 2026 Word templates, kept in
+# docs/email-templates/ at the repo root:
 #   Email Template - UNDER 5 yards Coupon Order Instructions.docx
 #   Email Template- OVER 5 yards Coupon Order Instructions.docx
+#   Email Template - Over 5 CY Coupon Order Instructions 7.29.26.docx
 #   Email Template- Delivery Request Receipt.docx
 #
 # These are sent as HTML because the copy relies on hyperlinks ("use this

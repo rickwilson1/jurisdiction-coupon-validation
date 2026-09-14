@@ -1,0 +1,84 @@
+                       AGROMIN COUPON DISPATCH — SYSTEM ARCHITECTURE  ·  Phase 1 (Order Intake)  ·  2026-06-04
+
+╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  CHECKOUT  (synchronous — coupon is validated before the order can be placed)                                                                                         ║
+╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+   ┌─────────────────┐  (1) coupon+address    ┌──────────────────────────┐  (2) GET /api/validate-coupon         ┌────────────────────────────────────────────────┐
+   │     CUSTOMER    │ ────────────────────▶  │       CIMCLOUD            │ ────────────────────────────────▶    │   COUPON-VALIDATOR  ·  Cloud Run · GCP         │
+   │  OC / Ventura / │                        │   shop.agromin.com        │       ◀───── accept / deny  ─────    │   FastAPI · Python                              │
+   │  Sacramento     │                        │   Sage 100 sync           │                                       │   ArcGIS geocode + CDTFA district + rules       │
+   │  resident       │                        │                           │                                       │   GCS coupons.xlsx (5-min TTL cache)            │
+   └─────────────────┘                        └──────────────────────────┘                                       └────────────────────────────────────────────────┘
+
+╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  FULFILLMENT  (asynchronous — after the order is placed)                                                                                                              ║
+╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+   ┌────────────────────┐  (3)   ┌────────────────────┐  trigger  ┌──────────────────────┐  (4) HTTPS POST + API-key   ┌──────────────────────────────────┐
+   │      CIMCLOUD      │ ─────▶ │   Outlook sales@   │ ────────▶ │   Power Automate     │ ────────────────────────▶   │   COUPON-DISPATCH  ·  Cloud Run  │
+   │   order placed     │        │   /OCWR folder     │           │   "Agromin Order     │                              │   FastAPI · Python               │
+   │   "Pending         │        │  ─────────────────  │           │    Dispatch" flow    │                              │   ──────────────────────────────  │
+   │    Approval" email │        │  receives email    │           │   parses HTML body   │                              │   /api/ingest-cimcloud-email     │
+   └────────────────────┘        └────────────────────┘           └──────────────────────┘                              │   /api/ingest-order              │
+                                                                                                                         │   /api/generate-manifest         │
+                                                                                                                         │   /api/delivery-schedule         │
+                                                                                                                         │                                  │
+                                                                                                                         │   routes pickup vs delivery       │
+                                                                                                                         │   selects email template          │
+                                                                                                                         │   sends + logs                   │
+                                                                                                                         └──┬───────────────┬───────────┬───┘
+                                                                                                                            │               │           │
+                                                                                                  (5) audit write           │               │           │  (7) JSON response
+                                                                                                                            ▼               ▼           ▼
+                                                                                                                  ┌─────────────────┐ ┌──────────────────────┐ ┌────────────────────────────┐
+                                                                                                                  │    Firestore    │ │ Outlook  dispatch@   │ │   SharePoint               │
+                                                                                                                  │     orders      │ │ ──────────────────── │ │   OCWRxAgromin             │
+                                                                                                                  │   (audit log)   │ │ → Customer (To)      │ │   Deliveries.xlsx          │
+                                                                                                                  └─────────────────┘ │ → ofelia@ (CC, all)  │ │   Table1                   │
+                                                                                                                                      │ → greg / brian /     │ │   ────────────────────────  │
+                                                                                                                                      │   kendall@           │ │   PA appends a row per     │
+                                                                                                                                      │   (delivery alerts)  │ │   delivery order (Stage A) │
+                                                                                                                                      │   via Graph Mail.Send│ └────────────────────────────┘
+                                                                                                                                      └──────────┬───────────┘
+                                                                                                                                                 │
+                                                                                                                                          (8) fulfillment
+                                                                                                                                              email
+                                                                                                                                                 ▼
+                                                                                                                                       ┌────────────────────┐
+                                                                                                                                       │      CUSTOMER       │
+                                                                                                                                       │  pickup or delivery │
+                                                                                                                                       │     instructions    │
+                                                                                                                                       └────────────────────┘
+
+╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  INFRASTRUCTURE                                                                                                                                                       ║
+╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+   ┌─ GOOGLE CLOUD PLATFORM ──────────────────────────────────────────────────────────────┐  ┌─ MICROSOFT 365   (Agromin tenant · admin: Converged MSP) ────────────────┐
+   │   project: juris-coupon-valid   ·   region: us-west1   ·   admin: dev team           │  │                                                                          │
+   │                                                                                      │  │   Mailboxes        sales@      (CIMcloud order intake)                  │
+   │   Cloud Run         coupon-validator (existing)   ·   coupon-dispatch (new)          │  │                    dispatch@   (system sender, Graph Mail.Send)         │
+   │   Firestore         orders collection  (audit log of every processed order)          │  │                    ofelia@     (OCWR liaison, CC on all orders)         │
+   │   GCS               agromin-coupon-data  ·  coupons.xlsx (5-min TTL cache)           │  │                    greg / brian / kendall@  (delivery coordinators)     │
+   │   Secret Manager    DISPATCH_API_KEY   ·   GRAPH_CLIENT_ID                           │  │                                                                          │
+   │                     GRAPH_TENANT_ID    ·   GRAPH_CLIENT_SECRET   ·   UPLOAD_API_KEY  │  │   Power Automate   "Agromin Order Dispatch" flow                        │
+   │   Bundled           CDTFA tax-district shapefile (inside validator container image)  │  │                    owner: rickwilson@                                    │
+   │                                                                                      │  │                                                                          │
+   └──────────────────────────────────────────────────────────────────────────────────────┘  │   SharePoint       OCWRxAgromin site · Deliveries.xlsx · Table1         │
+                                                                                              │   Azure AD         app reg w/ Mail.Send permission                       │
+                                                                                              │                    RBAC-scoped to dispatch@agromin.com only              │
+                                                                                              └──────────────────────────────────────────────────────────────────────────┘
+
+
+   TRUST BOUNDARY   GCP side = dev team controls (deploys, secrets, logs, Firestore)   ·   M365 side = Converged MSP controls (mailboxes, app reg, Exchange RBAC)
+                    BRIDGE:  Power Automate flow is owned by rickwilson@ — flow must be transferred before that account is disabled or it becomes orphaned
+
+   ROUTING LOGIC    shipping_method == "delivery"                  → delivery path
+                    shipping_method == "pickup"  +  qty <  5 cy    → self-load pickup
+                    shipping_method == "pickup"  +  qty >= 5 cy    → staff-load pickup
+                    yard assigned by zip → Oxnard · Camarillo · Dos Palos · Florin Perkins (Sacramento)
+
+   PHASE 2 (NEXT)   Greg's delivery-queue web UI    ·    customer "delivery scheduled" auto-email after Greg confirms date/time
+                    Ofelia's live schedule view     ·    yard staff fulfillment logging    ·    OCWR-formatted compliance export
+                    Database-of-record (Firestore or Cloud SQL) replaces SharePoint Excel as the system of truth

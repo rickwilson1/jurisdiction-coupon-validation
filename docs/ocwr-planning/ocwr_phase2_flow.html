@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OCWR × Agromin — Phase 2 Scheduling Flow</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #f5f5f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #2c3e2d;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .stage {
+    width: 100%;
+    max-width: 1400px;
+    aspect-ratio: 16 / 9;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .future-tag {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #fff;
+    background: #639922;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  header {
+    border-bottom: 2px solid #639922;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  header .eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #639922;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  header h1 {
+    font-size: 22px;
+    color: #4a6b3a;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  header p {
+    font-size: 12px;
+    color: #6c7a6d;
+    margin-top: 2px;
+  }
+
+  .lane-labels {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .row {
+    display: contents;
+  }
+
+  .lane-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #6c7a6d;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: right;
+    padding-right: 8px;
+    border-right: 2px solid #d6d8c7;
+  }
+
+  .resident .lane-label { color: #4a6b3a; }
+  .system .lane-label { color: #5a4a8e; }
+  .ocwr .lane-label { color: #b8732a; }
+
+  .lane {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .step {
+    flex: 1;
+    background: #fafaf3;
+    border: 1.5px solid #d6d8c7;
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .resident .step {
+    background: #f3f7ed;
+    border-color: #a3c178;
+  }
+  .system .step {
+    background: #f0eef7;
+    border-color: #a89dc7;
+  }
+  .ocwr .step {
+    background: #fdf2e3;
+    border-color: #e0a86b;
+  }
+
+  .step.carryover {
+    background: #f5f4f0 !important;
+    border-color: #c8c8c0 !important;
+    border-style: dashed !important;
+  }
+  .step.carryover .step-title,
+  .step.carryover .step-desc {
+    color: #8a8780;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2c3e2d;
+    margin-bottom: 3px;
+  }
+  .step-desc {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #5a6359;
+  }
+
+  .arrow {
+    color: #9ca39a;
+    font-size: 18px;
+    font-weight: bold;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .step .badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #6c7a6d;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .step .new-badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    background: #639922;
+    color: #fff;
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    background: #fff;
+    border: 1px solid #c0c4b3;
+    color: #4a6b3a;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-top: 3px;
+    font-weight: 600;
+  }
+  .system .pill { color: #5a4a8e; border-color: #b3aac9; }
+
+  .sys-tag {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #5a4a8e;
+    background: #fff;
+    border: 1px solid #b3aac9;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+    align-self: flex-start;
+  }
+  .sys-tag.green {
+    color: #3b6d11;
+    border-color: #a3c178;
+    background: #f3f7ed;
+  }
+
+  .step.stores {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+  }
+  .store {
+    background: #fff;
+    border: 1px solid #b3aac9;
+    border-radius: 6px;
+    padding: 4px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .store .sys-tag {
+    margin-bottom: 1px;
+    font-size: 9px;
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+  .store .store-label {
+    font-size: 10px;
+    color: #5a6359;
+    line-height: 1.2;
+  }
+  .store.sharepoint {
+    border-color: #e0a86b;
+    background: #fdf7ee;
+  }
+  .store.sharepoint .sys-tag { color: #b8732a; }
+
+  footer {
+    border-top: 1px solid #d6d8c7;
+    margin-top: 12px;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 10.5px;
+    color: #5a6359;
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .swatch {
+    width: 12px; height: 12px; border-radius: 3px;
+    border: 1.5px solid;
+  }
+  .sw-resident { background: #f3f7ed; border-color: #a3c178; }
+  .sw-system { background: #f0eef7; border-color: #a89dc7; }
+  .sw-ocwr { background: #fdf2e3; border-color: #e0a86b; }
+  .sw-carry { background: #f5f4f0; border-color: #c8c8c0; border-style: dashed; }
+  .sw-new {
+    background: #639922; border-color: #639922;
+    color: #fff; font-size: 8px; font-weight: 700;
+    width: auto; height: auto; padding: 1px 5px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  .footnote {
+    font-size: 10px;
+    color: #8a9388;
+    text-align: right;
+  }
+
+  .footnote strong { color: #5a6359; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="future-tag">Future · Phase 2</div>
+
+    <header>
+      <div class="eyebrow">Phase 2 of 2 · Future Development</div>
+      <h1>OCWR × Agromin — Delivery Scheduling &amp; Yard Logging</h1>
+      <p>Builds on Phase 1 intake. Adds three new tools — Greg's delivery queue, Ofelia's schedule view, and the yard fulfillment log — plus an automatic "your delivery is scheduled" email to the resident.</p>
+    </header>
+
+    <div class="lane-labels">
+
+      <!-- ROW 1: RESIDENT -->
+      <div class="row resident">
+        <div class="lane-label">Resident</div>
+        <div class="lane">
+          <div class="step carryover">
+            <div class="badge">From Phase 1</div>
+            <div class="step-title">Order acknowledged</div>
+            <div class="step-desc">Resident already received the intake confirmation email; now awaiting a delivery date</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 1</div>
+            <div class="step-title">Scheduling call</div>
+            <div class="step-desc">Greg phones the resident to agree on a delivery date and time window</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <div class="step-title">Scheduled email</div>
+            <div class="step-desc">Auto-email confirms the locked-in date, time window, and hauler contact</div>
+            <span class="pill">dispatch@agromin.com</span>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="badge">Step 4</div>
+            <div class="step-title">Receive delivery</div>
+            <div class="step-desc">Hauler arrives on the confirmed date; material delivered to the address</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: AUTOMATED SYSTEM -->
+      <div class="row system">
+        <div class="lane-label">Automation</div>
+        <div class="lane">
+          <div class="step">
+            <div class="new-badge">New</div>
+            <span class="sys-tag">Cloud Run</span>
+            <div class="step-title">Delivery Queue</div>
+            <div class="step-desc">Web page lists every pending delivery from Firestore</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <span class="sys-tag">Cloud Run</span>
+            <div class="step-title">Schedule API</div>
+            <div class="step-desc">Form posts confirmed date / time / notes; updates the order record</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <span class="sys-tag">M365 SMTP</span>
+            <div class="step-title">Confirmation sent</div>
+            <div class="step-desc">Customer email triggered automatically; Ofelia's view refreshes live</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step stores">
+            <div class="new-badge">New</div>
+            <div class="store">
+              <span class="sys-tag">Cloud Run + Firestore</span>
+              <div class="store-label">Yard Fulfillment Log<br>(replaces Greenery Excel)</div>
+            </div>
+            <div class="store sharepoint">
+              <span class="sys-tag">SharePoint Excel</span>
+              <div class="store-label">Compliance export for OCWR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 3: OCWR / AGROMIN PEOPLE -->
+      <div class="row ocwr">
+        <div class="lane-label">OCWR &amp; Agromin</div>
+        <div class="lane">
+          <div class="step">
+            <div class="new-badge">New</div>
+            <div class="step-title">Greg works the queue</div>
+            <div class="step-desc">Opens dispatch.agromin.com/deliveries; sees every pending order in one place</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <div class="step-title">Logs the schedule</div>
+            <div class="step-desc">Enters confirmed date and time into the form; one click sends the customer email</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <div class="step-title">Ofelia's live view</div>
+            <div class="step-desc">Read-only schedule for this week / next week — replaces the Friday email summary</div>
+          </div>
+          <span class="arrow">›</span>
+          <div class="step">
+            <div class="new-badge">New</div>
+            <div class="step-title">Yard log + reports</div>
+            <div class="step-desc">Yard staff log fulfillment at the gate tablet; Kendall pulls SB 1383 / compliance CSV on demand</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch sw-resident"></span>Resident actions</div>
+        <div class="legend-item"><span class="swatch sw-system"></span>Automated systems</div>
+        <div class="legend-item"><span class="swatch sw-ocwr"></span>OCWR &amp; Agromin people</div>
+        <div class="legend-item"><span class="swatch sw-carry"></span>Carryover from Phase 1</div>
+        <div class="legend-item"><span class="sw-new">New</span> Built in Phase 2</div>
+      </div>
+      <div class="footnote">
+        Foundation for SB 1383 reporting · <strong>Ventura</strong>, <strong>Sacramento</strong> rollout next
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
