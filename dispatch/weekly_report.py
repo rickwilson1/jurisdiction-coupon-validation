@@ -509,6 +509,18 @@ def _material_group(description: str) -> str:
 # ---------------------------------------------------
 # Rendering: subject, HTML, text
 # ---------------------------------------------------
+_JURISDICTION_PREFIX_RE = re.compile(r"^(?:City|Town|County) of\s+", re.IGNORECASE)
+
+
+def short_name(jurisdiction: str) -> str:
+    """Email-body form of a jurisdiction: 'City of Santa Ana' -> 'Santa Ana'.
+
+    The workbook keeps the coupon master's full name; only the rendered email
+    drops the prefix so multi-city cells stay on one or two lines.
+    """
+    return _JURISDICTION_PREFIX_RE.sub("", jurisdiction or "")
+
+
 def _range_label(start: date, end: date) -> str:
     if start.month == end.month:
         return f"{start:%B} {start.day} to {end.day}, {end.year}"
@@ -537,7 +549,7 @@ def _summary_sentences(r: WeeklyReport) -> list[str]:
         if w.delivery:
             parts.append(f"{w.delivery} delivery")
         mix = ", ".join(parts)
-        cities = ", ".join(w.jurisdictions)
+        cities = ", ".join(short_name(j) for j in w.jurisdictions)
         first = (
             f"{w.orders} coupon order{'s' if w.orders != 1 else ''} for "
             f"{format_qty(w.cubic_yards)} cubic yards came through in the week of "
@@ -620,7 +632,7 @@ def _weekly_rows(r: WeeklyReport) -> tuple[list[str], list[list], set[int]]:
             b.self_load,
             b.staff_load,
             b.delivery,
-            ", ".join(b.jurisdictions),
+            ", ".join(short_name(j) for j in b.jurisdictions),
         ]
         for b in r.weekly
     ]
@@ -634,7 +646,7 @@ def _jurisdiction_rows(r: WeeklyReport) -> tuple[list[str], list[list], set[int]
     rows = []
     for b in r.by_jurisdiction:
         row = [
-            b.label,
+            short_name(b.label),
             ", ".join(b.codes),
             b.orders,
             format_qty(b.cubic_yards),
@@ -719,7 +731,7 @@ def render_html(r: WeeklyReport) -> str:
             [
                 o.order_number,
                 f"{o.order_date:%a %b %-d}",
-                o.jurisdiction,
+                short_name(o.jurisdiction),
                 _material_group(o.material),
                 format_qty(o.total_qty),
                 o.routing_label,
@@ -791,7 +803,7 @@ def render_text(r: WeeklyReport) -> str:
             [
                 o.order_number,
                 f"{o.order_date:%a %b %-d}",
-                o.jurisdiction,
+                short_name(o.jurisdiction),
                 _material_group(o.material),
                 format_qty(o.total_qty),
                 o.routing_label,

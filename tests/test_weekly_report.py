@@ -206,6 +206,27 @@ check(
     ["IRVINECOM26", "CITYIRVCOM26"],
 )
 
+print("\nshort_name")
+check("strips City of", wr.short_name("City of Santa Ana"), "Santa Ana")
+check("strips County of", wr.short_name("County of Orange"), "Orange")
+check("leaves bare names", wr.short_name("Santa Ana"), "Santa Ana")
+check("handles empty", wr.short_name(""), "")
+r_full = wr.build_report(
+    wr.normalize_events(DOCS, {"CITYNPBCOM26": "City of Newport Beach"}, excluded={"A1"}),
+    date(2026, 9, 7),
+    date(2026, 9, 13),
+    generated_at=datetime(2026, 9, 14, 7, 0),
+)
+html_full = wr.render_html(r_full)
+check("email body drops City of prefix", "City of Newport Beach" in html_full, False)
+check("email body keeps the city", "Newport Beach" in html_full, True)
+xlsx_full = load_workbook(BytesIO(wr.build_xlsx(r_full)))["Week orders"]
+check(
+    "workbook keeps full jurisdiction name",
+    [c.value for c in xlsx_full[2]][4],
+    "City of Newport Beach",
+)
+
 print("\nrendering")
 subj = wr.subject_line(r)
 check(
