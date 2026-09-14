@@ -32,10 +32,56 @@ coupon-dispatch  (this service — FREQUENTLY UPDATED)
 - `POST /api/ingest-order` — primary entry, called by Power Automate
 - `POST /api/generate-manifest` — returns delivery PDF
 - `GET  /api/delivery-schedule` — last 7 days of delivery orders
+- `GET  /api/weekly-coupon-report` — Monday 7am PT coupon activity email (see below)
 - `GET  /health` — Cloud Run health check
 
 All non-health endpoints require `X-API-Key` header matching
 `DISPATCH_API_KEY` env var.
+
+## Weekly coupon activity report
+
+`weekly_report.py` builds the Monday-morning summary from Firestore
+`order_events`: the prior Monday-to-Sunday week, a trailing eight-week series,
+program-to-date by jurisdiction, a monthly rollup, and material/site splits.
+The email body is table-layout HTML with inline CSS (Outlook-safe) plus a
+plain-text alternative, and an `.xlsx` with order-level detail is attached.
+The attachment carries customer contact fields; recipients are internal only.
+
+Orders are dated by the CIMcloud order date (Pacific `processed_at` date as
+fallback). Test orders listed in `WEEKLY_REPORT_EXCLUDE` (default `A1`) are
+dropped. Jurisdiction names come from `coupons.xlsx` in the
+`agromin-coupon-data` bucket; if that read fails the code abbreviation table
+in `weekly_report.py` is used and the email says so in its notes.
+
+Query parameters on `GET /api/weekly-coupon-report`:
+
+| Param | Effect |
+|---|---|
+| `preview=true` | Return the HTML body for viewing in a browser; nothing is sent |
+| `send=false` | Build the report, return summary JSON, nothing is sent |
+| `week_ending=YYYY-MM-DD` | Re-run for a past week; must be a Sunday |
+| `to=a@x,b@x` | Override the recipient list for a test send |
+
+Cloud Scheduler job (create once; the service account needs no special
+role because the endpoint authenticates with the API key header). As of
+2026-09-14 the Cloud Scheduler API had never been enabled on
+`juris-coupon-valid`, so enable it first:
+
+```bash
+gcloud services enable cloudscheduler.googleapis.com --project juris-coupon-valid
+
+gcloud scheduler jobs create http weekly-coupon-report \
+  --project juris-coupon-valid --location us-west1 \
+  --schedule "0 7 * * 1" --time-zone "America/Los_Angeles" \
+  --uri "https://coupon-dispatch-751008504644.us-west1.run.app/api/weekly-coupon-report" \
+  --http-method GET \
+  --headers "X-API-Key=$DISPATCH_API_KEY" \
+  --attempt-deadline 300s
+```
+
+Firestore reads the whole `order_events` collection on each run, which is
+fine at current volume (tens of documents); revisit with a date-indexed query
+if it grows past a few thousand.
 
 ## Environment variables
 
@@ -57,6 +103,8 @@ is scoped via Exchange RBAC to send only as `dispatch@agromin.com`.
 | `CHRIS_EMAIL` | No | Ventura coordinator |
 | `ROSA_EMAIL` | No | Sacramento coordinator |
 | `CONFIRMATION_BCC` | No | Comma-separated internal BCC on every customer confirmation. Defaults to `KENDALL_EMAIL`. Set to an empty string to disable. |
+| `WEEKLY_REPORT_TO` | No | Comma-separated recipients of the Monday coupon report. Defaults to the 13-address internal list in `weekly_report.py`. |
+| `WEEKLY_REPORT_EXCLUDE` | No | Comma-separated order numbers to drop from the report as test orders. Defaults to `A1`. |
 
 If Graph creds are unset, email sending is skipped with a warning log
 (useful for local development).

@@ -5,12 +5,14 @@ Standalone FastAPI service that handles post-checkout order dispatch:
   POST /api/ingest-order      — route + email customer + alert coordinator
   POST /api/generate-manifest — produce a delivery PDF manifest
   GET  /api/delivery-schedule — return last 7 days of delivery orders
+  GET  /api/weekly-coupon-report — Monday 7am PT coupon activity email
 
 Coupon validation happens upstream in the coupon-validator service at
 checkout. This service trusts that any order it receives via Power
 Automate is already a confirmed program order.
 """
 
+import base64
 import html
 import logging
 import os
@@ -18,7 +20,7 @@ import quopri
 import re
 import textwrap
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
@@ -26,7 +28,7 @@ import msal
 import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from google.cloud import firestore as firestore_client
 from pydantic import BaseModel
 from reportlab.lib import colors
@@ -41,6 +43,14 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+
+# The container runs `uvicorn main:app` from /app with no package, so the
+# sibling module is a top-level import there; the test suite imports this file
+# as `dispatch.main` from the repo root, where only the relative form resolves.
+try:
+    from . import weekly_report
+except ImportError:
+    import weekly_report
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -542,25 +552,29 @@ def _get_graph_token() -> str:
 
 
 def send_email(
-    to: str,
+    to: str | list,
     subject: str,
     body: str,
     cc: list = None,
     bcc: list = None,
     html_body: str = None,
     reply_to: list = None,
+    attachments: list[tuple[str, bytes, str]] = None,
 ) -> bool:
     """Send an email via Microsoft Graph as MAIL_SENDER (dispatch@agromin.com).
 
-    Sends `html_body` as HTML when supplied so hyperlinks are clickable,
-    otherwise sends `body` as plain text. Returns True only when Graph accepts
-    the message so callers can log a real send result instead of assuming
-    success.
+    `to` may be a single address or a list. Sends `html_body` as HTML when
+    supplied so hyperlinks are clickable, otherwise sends `body` as plain text.
+    `attachments` is a list of (filename, bytes, content_type) tuples, sent
+    inline as base64 file attachments (Graph accepts up to 3 MB this way).
+    Returns True only when Graph accepts the message so callers can log a real
+    send result instead of assuming success.
 
     Returns False if Graph credentials are not configured (useful for local dev).
     """
+    to_list = [to] if isinstance(to, str) else [t for t in to if t]
     if not (GRAPH_TENANT_ID and GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET):
-        logger.warning("Graph credentials not configured — email skipped (to=%s)", to)
+        logger.warning("Graph credentials not configured — email skipped (to=%s)", to_list)
         return False
 
     try:
@@ -571,7 +585,7 @@ def send_email(
         message = {
             "subject": subject,
             "body": {"contentType": content_type, "content": content},
-            "toRecipients": [{"emailAddress": {"address": to}}],
+            "toRecipients": [{"emailAddress": {"address": t}} for t in to_list],
         }
         if cc:
             message["ccRecipients"] = [{"emailAddress": {"address": c}} for c in cc]
@@ -579,6 +593,16 @@ def send_email(
             message["bccRecipients"] = [{"emailAddress": {"address": b}} for b in bcc]
         if reply_to:
             message["replyTo"] = [{"emailAddress": {"address": r}} for r in reply_to]
+        if attachments:
+            message["attachments"] = [
+                {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": name,
+                    "contentType": ctype,
+                    "contentBytes": base64.b64encode(data).decode("ascii"),
+                }
+                for name, data, ctype in attachments
+            ]
 
         url = f"https://graph.microsoft.com/v1.0/users/{MAIL_SENDER}/sendMail"
         resp = requests.post(
@@ -588,13 +612,13 @@ def send_email(
                 "Content-Type": "application/json",
             },
             json={"message": message, "saveToSentItems": True},
-            timeout=15,
+            timeout=30 if attachments else 15,
         )
 
         if resp.status_code in (200, 202):
             logger.info(
                 "Email sent to=%s cc=%s bcc=%s subject=%s",
-                to,
+                to_list,
                 cc or [],
                 bcc or [],
                 subject,
@@ -604,12 +628,12 @@ def send_email(
         logger.error(
             "Graph sendMail failed (status=%s) for to=%s: %s",
             resp.status_code,
-            to,
+            to_list,
             resp.text,
         )
         return False
     except Exception as e:
-        logger.error("Failed to send email to %s: %s", to, e)
+        logger.error("Failed to send email to %s: %s", to_list, e)
         return False
 
 
@@ -1518,6 +1542,7 @@ async def root():
             "POST /api/ingest-order",
             "POST /api/generate-manifest",
             "GET  /api/delivery-schedule",
+            "GET  /api/weekly-coupon-report",
             "GET  /health",
         ],
     }
@@ -1909,3 +1934,98 @@ async def delivery_schedule(
         return {"status": "ok", "count": len(orders), "orders": orders}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ---------------------------------------------------
+# GET /api/weekly-coupon-report
+# Cloud Scheduler hits this Monday 07:00 America/Los_Angeles. Reports the
+# prior Monday-to-Sunday week plus program-to-date, emails the internal list
+# with an xlsx of order-level detail attached.
+#
+#   ?preview=true            render the HTML body in the browser, no send
+#   ?send=false              build everything, return JSON, no send
+#   ?week_ending=YYYY-MM-DD  re-run for a past week (must be a Sunday)
+#   ?to=a@x.com,b@x.com      override recipients for a test send
+# ---------------------------------------------------
+def _build_weekly_report(week_ending: str | None) -> weekly_report.WeeklyReport:
+    today = datetime.now(weekly_report.PACIFIC_TZ).date()
+    if week_ending:
+        week_end = date.fromisoformat(week_ending)
+        if week_end.weekday() != 6:
+            raise HTTPException(status_code=400, detail="week_ending must be a Sunday")
+        week_start = week_end - timedelta(days=6)
+    else:
+        week_start, week_end = weekly_report.report_week(today)
+
+    jurisdictions = weekly_report.load_jurisdiction_map()
+    docs = [doc.to_dict() for doc in get_firestore().collection("order_events").stream()]
+    orders = weekly_report.normalize_events(docs, jurisdictions)
+    return weekly_report.build_report(
+        orders,
+        week_start,
+        week_end,
+        jurisdiction_source="coupon master" if jurisdictions else "abbreviation fallback",
+    )
+
+
+@app.get("/api/weekly-coupon-report")
+async def weekly_coupon_report(
+    x_api_key: str = Header(None, alias="X-API-Key"),
+    send: bool = True,
+    preview: bool = False,
+    week_ending: str | None = None,
+    to: str | None = None,
+):
+    if x_api_key != DISPATCH_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    try:
+        report = _build_weekly_report(week_ending)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Weekly coupon report build failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    html_body = weekly_report.render_html(report)
+    if preview:
+        return HTMLResponse(html_body)
+
+    subject = weekly_report.subject_line(report)
+    recipients = (
+        [e.strip() for e in to.split(",") if e.strip()] if to else weekly_report.recipients_from_env()
+    )
+    result = {
+        "status": "ok",
+        "week_start": report.week_start.isoformat(),
+        "week_end": report.week_end.isoformat(),
+        "subject": subject,
+        "week_orders": report.week.orders,
+        "week_cubic_yards": report.week.cubic_yards,
+        "to_date_orders": report.to_date.orders,
+        "to_date_cubic_yards": report.to_date.cubic_yards,
+        "recipients": recipients,
+        "jurisdiction_source": report.jurisdiction_source,
+        "sent": False,
+    }
+    if not send:
+        return result
+
+    xlsx = weekly_report.build_xlsx(report)
+    result["sent"] = send_email(
+        to=recipients,
+        subject=subject,
+        body=weekly_report.render_text(report),
+        html_body=html_body,
+        reply_to=["rickwilson@agromin.com"],
+        attachments=[
+            (
+                weekly_report.attachment_filename(report),
+                xlsx,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        ],
+    )
+    if not result["sent"]:
+        result["status"] = "send_failed"
+    return result
